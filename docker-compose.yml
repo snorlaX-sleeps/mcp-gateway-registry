@@ -247,6 +247,8 @@ services:
       # Registry API static token auth (IdP-independent access)
       - REGISTRY_STATIC_TOKEN_AUTH_ENABLED=${REGISTRY_STATIC_TOKEN_AUTH_ENABLED:-false}
       - REGISTRY_API_TOKEN=${REGISTRY_API_TOKEN:-}
+      # OAuth token storage in session (set to false for Entra ID large tokens)
+      - OAUTH_STORE_TOKENS_IN_SESSION=${OAUTH_STORE_TOKENS_IN_SESSION:-true}
     ports:
       - "8888:8888"
     volumes:
