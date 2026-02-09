@@ -30,13 +30,14 @@ from registry.api.management_routes import router as management_router
 from registry.api.federation_routes import router as federation_router
 from registry.api.federation_export_routes import router as federation_export_router
 from registry.api.peer_management_routes import router as peer_management_router
+from registry.api.skill_routes import router as skill_router
 from registry.health.routes import router as health_router
 from registry.audit.routes import router as audit_router
 
 # Import auth dependencies
 from registry.auth.dependencies import (
-    enhanced_auth,
     get_ui_permissions_for_user,
+    nginx_proxied_auth,
 )
 
 # Import services for initialization
@@ -327,6 +328,10 @@ app = FastAPI(
         {
             "name": "Audit Logs",
             "description": "Audit log viewing and export endpoints. Requires admin permissions."
+        },
+        {
+            "name": "skills",
+            "description": "Agent Skills registration and management. Requires JWT Bearer token authentication."
         }
     ]
 )
@@ -383,6 +388,7 @@ app.include_router(agent_router, prefix="/api", tags=["Agent Management"])
 app.include_router(management_router, prefix="/api")
 app.include_router(search_router, prefix="/api/search", tags=["Semantic Search"])
 app.include_router(federation_router, prefix="/api", tags=["federation"])
+app.include_router(skill_router, prefix="/api", tags=["skills"])
 app.include_router(health_router, prefix="/api/health", tags=["Health Monitoring"])
 app.include_router(federation_export_router)
 app.include_router(peer_management_router)
@@ -439,7 +445,7 @@ app.openapi = custom_openapi
 
 # Add user info endpoint for React auth context
 @app.get("/api/auth/me")
-async def get_current_user(user_context: Dict[str, Any] = Depends(enhanced_auth)):
+async def get_current_user(user_context: Dict[str, Any] = Depends(nginx_proxied_auth)):
     """Get current user information for React auth context"""
     # Get user's scopes
     user_scopes = user_context.get("scopes", [])
