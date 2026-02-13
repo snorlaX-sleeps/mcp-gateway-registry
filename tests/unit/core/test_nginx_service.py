@@ -622,3 +622,155 @@ server {
                             result = await nginx_service.generate_config_async(sample_servers)
 
                             assert result is True
+
+
+# =============================================================================
+# KEYCLOAK CONDITIONAL LOCATION TESTS
+# =============================================================================
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_generate_config_async_strips_keycloak_locations_for_entra(nginx_service, sample_servers, mock_health_service):
+    """Test that Keycloak location blocks are stripped when AUTH_PROVIDER is entra."""
+    template_content = """
+server {
+    listen 80;
+    server_name localhost {{ADDITIONAL_SERVER_NAMES}};
+
+    # {{KEYCLOAK_LOCATIONS_START}}
+    location /keycloak/ {
+        proxy_pass {{KEYCLOAK_SCHEME}}://{{KEYCLOAK_HOST}}:{{KEYCLOAK_PORT}}/;
+    }
+
+    location /realms/ {
+        proxy_pass {{KEYCLOAK_SCHEME}}://{{KEYCLOAK_HOST}}:{{KEYCLOAK_PORT}}/realms/;
+    }
+    # {{KEYCLOAK_LOCATIONS_END}}
+
+{{LOCATION_BLOCKS}}
+}
+"""
+
+    env_values = {
+        "AUTH_PROVIDER": "entra",
+        "KEYCLOAK_URL": "http://keycloak:8080",
+        "NGINX_DISABLE_API_AUTH_REQUEST": "false",
+    }
+
+    with patch.object(nginx_service.nginx_template_path, "exists", return_value=True):
+        with patch("builtins.open", mock_open(read_data=template_content)) as mock_file:
+            with patch("registry.health.service.health_service", mock_health_service):
+                mock_health_service.server_health_status = {
+                    "/test-server": HealthStatus.HEALTHY,
+                }
+
+                with patch.object(nginx_service, "get_additional_server_names", return_value=""):
+                    with patch.object(nginx_service, "reload_nginx", return_value=True):
+                        with patch("os.environ.get", side_effect=lambda key, default=None: env_values.get(key, default)):
+                            result = await nginx_service.generate_config_async(sample_servers)
+
+                            assert result is True
+
+                            # Verify the written config does not contain keycloak locations
+                            write_calls = mock_file().write.call_args_list
+                            assert len(write_calls) > 0
+                            written_content = write_calls[0][0][0]
+                            assert "/keycloak/" not in written_content
+                            assert "/realms/" not in written_content
+                            assert "KEYCLOAK_LOCATIONS_START" not in written_content
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_generate_config_async_keeps_keycloak_locations_for_keycloak(nginx_service, sample_servers, mock_health_service):
+    """Test that Keycloak location blocks are kept when AUTH_PROVIDER is keycloak."""
+    template_content = """
+server {
+    listen 80;
+    server_name localhost {{ADDITIONAL_SERVER_NAMES}};
+
+    # {{KEYCLOAK_LOCATIONS_START}}
+    location /keycloak/ {
+        proxy_pass {{KEYCLOAK_SCHEME}}://{{KEYCLOAK_HOST}}:{{KEYCLOAK_PORT}}/;
+    }
+
+    location /realms/ {
+        proxy_pass {{KEYCLOAK_SCHEME}}://{{KEYCLOAK_HOST}}:{{KEYCLOAK_PORT}}/realms/;
+    }
+    # {{KEYCLOAK_LOCATIONS_END}}
+
+{{LOCATION_BLOCKS}}
+}
+"""
+
+    env_values = {
+        "AUTH_PROVIDER": "keycloak",
+        "KEYCLOAK_URL": "https://keycloak.example.com:8443",
+        "NGINX_DISABLE_API_AUTH_REQUEST": "false",
+    }
+
+    with patch.object(nginx_service.nginx_template_path, "exists", return_value=True):
+        with patch("builtins.open", mock_open(read_data=template_content)) as mock_file:
+            with patch("registry.health.service.health_service", mock_health_service):
+                mock_health_service.server_health_status = {
+                    "/test-server": HealthStatus.HEALTHY,
+                }
+
+                with patch.object(nginx_service, "get_additional_server_names", return_value=""):
+                    with patch.object(nginx_service, "reload_nginx", return_value=True):
+                        with patch("os.environ.get", side_effect=lambda key, default=None: env_values.get(key, default)):
+                            result = await nginx_service.generate_config_async(sample_servers)
+
+                            assert result is True
+
+                            # Verify the written config contains keycloak locations with substituted values
+                            write_calls = mock_file().write.call_args_list
+                            assert len(write_calls) > 0
+                            written_content = write_calls[0][0][0]
+                            assert "/keycloak/" in written_content
+                            assert "/realms/" in written_content
+                            assert "keycloak.example.com" in written_content
+                            assert "8443" in written_content
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_generate_config_async_strips_keycloak_locations_for_cognito(nginx_service, sample_servers, mock_health_service):
+    """Test that Keycloak location blocks are stripped when AUTH_PROVIDER is cognito."""
+    template_content = """
+server {
+    listen 80;
+    server_name localhost {{ADDITIONAL_SERVER_NAMES}};
+
+    # {{KEYCLOAK_LOCATIONS_START}}
+    location /keycloak/ {
+        proxy_pass {{KEYCLOAK_SCHEME}}://{{KEYCLOAK_HOST}}:{{KEYCLOAK_PORT}}/;
+    }
+    # {{KEYCLOAK_LOCATIONS_END}}
+
+{{LOCATION_BLOCKS}}
+}
+"""
+
+    env_values = {
+        "AUTH_PROVIDER": "cognito",
+        "NGINX_DISABLE_API_AUTH_REQUEST": "false",
+    }
+
+    with patch.object(nginx_service.nginx_template_path, "exists", return_value=True):
+        with patch("builtins.open", mock_open(read_data=template_content)) as mock_file:
+            with patch("registry.health.service.health_service", mock_health_service):
+                mock_health_service.server_health_status = {}
+
+                with patch.object(nginx_service, "get_additional_server_names", return_value=""):
+                    with patch.object(nginx_service, "reload_nginx", return_value=True):
+                        with patch("os.environ.get", side_effect=lambda key, default=None: env_values.get(key, default)):
+                            result = await nginx_service.generate_config_async(sample_servers)
+
+                            assert result is True
+
+                            write_calls = mock_file().write.call_args_list
+                            assert len(write_calls) > 0
+                            written_content = write_calls[0][0][0]
+                            assert "/keycloak/" not in written_content
