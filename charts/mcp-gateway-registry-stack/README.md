@@ -187,6 +187,10 @@ helm install mcp-gateway-registry -n MYNAMESPACE --create-namespace .
 
 This will deploy the necessary resources for a Kubernetes deployment of the MCP Gateway Registry
 
+**Note:** You can add `--set global.chartVersion=$(git rev-parse HEAD)` to your helm install command, which will create
+a configmap that has the version of the repository as the value. This can aid in debugging by making it much faster to
+identify which version was used to deploy the charts.
+
 ## Deploy Process
 
 ### With Keycloak:
