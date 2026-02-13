@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
         - name: job
-          image: python:3.13-slim
+          image: public.ecr.aws/docker/library/python:3.13-slim
           command: ["/bin/bash", "/app/script.sh"]
           envFrom:
             - secretRef:

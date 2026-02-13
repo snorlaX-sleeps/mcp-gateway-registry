@@ -25,7 +25,7 @@ spec:
     spec:
       initContainers:
         - name: wait-for-mongodb
-          image: python:3.13-alpine
+          image: public.ecr.aws/docker/library/python:3.13-slim
           command: ['sh', '-c']
           envFrom:
             - secretRef:
