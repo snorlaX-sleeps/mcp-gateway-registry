@@ -1666,7 +1666,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                     onEdit={handleEditSkill}
                     onDelete={(path: string) => setShowDeleteSkillConfirm(path)}
                     canModify={user?.can_modify_servers || false}
-                    canToggle={hasUiPermission('toggle_skill', skill.path)}
+                    canToggle={user?.is_admin || hasUiPermission('toggle_skill', skill.path)}
                     onRefreshSuccess={refreshSkills}
                     onShowToast={showToast}
                     onSkillUpdate={handleSkillUpdate}
