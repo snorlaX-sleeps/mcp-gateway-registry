@@ -251,6 +251,8 @@ def test_settings(tmp_path: Path) -> Settings:
         embeddings_model_dimensions=384,
         documentdb_host="localhost",  # Use localhost for tests
         documentdb_port=27017,
+        documentdb_use_tls=False,  # Disable TLS for local MongoDB in tests
+        documentdb_direct_connection=True,  # Use direct connection for single-node MongoDB
     )
 
     # Patch path properties to use temp directories
