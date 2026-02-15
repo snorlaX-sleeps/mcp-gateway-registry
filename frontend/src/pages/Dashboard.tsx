@@ -1128,8 +1128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
     <>
       {/* MCP Servers Section - Grouped by Registry */}
       {registryConfig?.features.mcp_servers !== false &&
-        (viewFilter === 'all' || viewFilter === 'servers') &&
-        (filteredServers.length > 0 || (!searchTerm && activeFilter === 'all')) && (
+        (viewFilter === 'all' || viewFilter === 'servers') && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -1370,8 +1369,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
 
       {/* A2A Agents Section - Grouped by Registry */}
       {registryConfig?.features.agents !== false &&
-        (viewFilter === 'all' || viewFilter === 'agents') &&
-        (filteredAgents.length > 0 || (!searchTerm && activeFilter === 'all')) && (
+        (viewFilter === 'all' || viewFilter === 'agents') && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -1605,8 +1603,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
 
       {/* Agent Skills Section */}
       {registryConfig?.features.skills !== false &&
-        (viewFilter === 'all' || viewFilter === 'skills') &&
-        (filteredSkills.length > 0 || (!searchTerm && activeFilter === 'all')) && (
+        (viewFilter === 'all' || viewFilter === 'skills') && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -1772,19 +1769,6 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
         </div>
       )}
 
-      {/* Empty state when all are filtered out */}
-      {((viewFilter === 'all' && filteredServers.length === 0 && filteredAgents.length === 0 && filteredSkills.length === 0) ||
-        (viewFilter === 'servers' && filteredServers.length === 0) ||
-        (viewFilter === 'agents' && filteredAgents.length === 0) ||
-        (viewFilter === 'skills' && filteredSkills.length === 0)) &&
-        (searchTerm || activeFilter !== 'all') && (
-          <div className="text-center py-16">
-            <div className="text-gray-400 text-xl mb-4">No items found</div>
-            <p className="text-gray-500 dark:text-gray-300 text-base max-w-md mx-auto">
-              Press Enter in the search bar to search semantically
-            </p>
-          </div>
-        )}
     </>
   );
 
