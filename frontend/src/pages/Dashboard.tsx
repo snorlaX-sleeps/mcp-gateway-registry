@@ -1271,7 +1271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                               onEdit={handleEditServer}
                               canModify={user?.can_modify_servers || false}
                               canHealthCheck={hasUiPermission('health_check_service', server.path)}
-                              canToggle={hasUiPermission('toggle_service', server.path)}
+                              canToggle={user?.is_admin || hasUiPermission('toggle_service', server.path)}
                               canDelete={(user?.is_admin || hasUiPermission('delete_service', server.path)) && !server.sync_metadata?.is_federated}
                               onDelete={handleDeleteServer}
                               onRefreshSuccess={refreshData}
@@ -1348,7 +1348,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                                 onEdit={handleEditServer}
                                 canModify={user?.can_modify_servers || false}
                                 canHealthCheck={hasUiPermission('health_check_service', server.path)}
-                                canToggle={hasUiPermission('toggle_service', server.path)}
+                                canToggle={user?.is_admin || hasUiPermission('toggle_service', server.path)}
                                 canDelete={(user?.is_admin || hasUiPermission('delete_service', server.path)) && !server.sync_metadata?.is_federated}
                                 onDelete={handleDeleteServer}
                                 onRefreshSuccess={refreshData}
@@ -1496,7 +1496,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                               onEdit={handleEditAgent}
                               canModify={user?.can_modify_servers || false}
                               canHealthCheck={hasUiPermission('health_check_agent', agent.path)}
-                              canToggle={hasUiPermission('toggle_agent', agent.path)}
+                              canToggle={user?.is_admin || hasUiPermission('toggle_agent', agent.path)}
                               canDelete={
                                 (user?.is_admin ||
                                 hasUiPermission('delete_agent', agent.path) ||
@@ -1578,7 +1578,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                                 onEdit={handleEditAgent}
                                 canModify={user?.can_modify_servers || false}
                                 canHealthCheck={hasUiPermission('health_check_agent', agent.path)}
-                                canToggle={hasUiPermission('toggle_agent', agent.path)}
+                                canToggle={user?.is_admin || hasUiPermission('toggle_agent', agent.path)}
                                 canDelete={
                                   (user?.is_admin ||
                                   hasUiPermission('delete_agent', agent.path) ||
@@ -1751,7 +1751,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFilter = 'all' }) => {
                         onEdit={handleEditAgent}
                         canModify={user?.can_modify_servers || false}
                         canHealthCheck={hasUiPermission('health_check_agent', agent.path)}
-                        canToggle={hasUiPermission('toggle_agent', agent.path)}
+                        canToggle={user?.is_admin || hasUiPermission('toggle_agent', agent.path)}
                         canDelete={
                           (user?.is_admin ||
                           hasUiPermission('delete_agent', agent.path) ||
