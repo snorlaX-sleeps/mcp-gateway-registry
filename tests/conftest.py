@@ -81,7 +81,11 @@ def pytest_configure(config):
     # (AWS DocumentDB clusters should NOT use directConnection)
     os.environ["DOCUMENTDB_DIRECT_CONNECTION"] = "true"
 
-    print("Test environment configured: DOCUMENTDB_HOST=localhost, STORAGE_BACKEND=mongodb-ce, DOCUMENTDB_DIRECT_CONNECTION=true")
+    # Disable TLS for local MongoDB in tests
+    # (AWS DocumentDB requires TLS, but local MongoDB CE does not)
+    os.environ["DOCUMENTDB_USE_TLS"] = "false"
+
+    print("Test environment configured: DOCUMENTDB_HOST=localhost, STORAGE_BACKEND=mongodb-ce, DOCUMENTDB_DIRECT_CONNECTION=true, DOCUMENTDB_USE_TLS=false")
 
     # Force reload settings if it's already been imported
     # This is needed because Settings() is created at module level
