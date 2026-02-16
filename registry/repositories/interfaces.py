@@ -690,6 +690,24 @@ class SearchRepositoryBase(ABC):
         """
         pass
 
+    async def index_virtual_server(
+        self,
+        path: str,
+        virtual_server: Any,
+        is_enabled: bool = False,
+    ) -> None:
+        """Index a virtual server for search.
+
+        Default implementation is a no-op. Override in implementations
+        that support virtual server indexing.
+
+        Args:
+            path: Virtual server path (e.g., /virtual/dev-essentials)
+            virtual_server: VirtualServerConfig object
+            is_enabled: Whether virtual server is enabled
+        """
+        pass
+
 
 class PeerFederationRepositoryBase(ABC):
     """Abstract base class for peer federation storage."""

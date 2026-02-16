@@ -583,6 +583,108 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
             logger.error(f"Failed to index skill in search: {e}", exc_info=True)
 
 
+    async def index_virtual_server(
+        self,
+        path: str,
+        virtual_server: Any,
+        is_enabled: bool = False,
+    ) -> None:
+        """Index a virtual server for semantic search.
+
+        Args:
+            path: Virtual server path (e.g., /virtual/dev-essentials)
+            virtual_server: VirtualServerConfig object
+            is_enabled: Whether virtual server is enabled
+        """
+        collection = await self._get_collection()
+
+        # Compose text for embedding
+        text_parts = [
+            virtual_server.server_name,
+            virtual_server.description or "",
+        ]
+
+        # Add tags
+        if virtual_server.tags:
+            text_parts.append(f"Tags: {', '.join(virtual_server.tags)}")
+
+        # Add tool names from mappings for better semantic search
+        tool_names = []
+        for mapping in virtual_server.tool_mappings:
+            display_name = mapping.alias or mapping.tool_name
+            tool_names.append(display_name)
+            if mapping.description_override:
+                text_parts.append(mapping.description_override)
+
+        if tool_names:
+            text_parts.append(f"Tools: {', '.join(tool_names)}")
+
+        text_for_embedding = " ".join(filter(None, text_parts))
+
+        # Generate embedding
+        try:
+            model = await self._get_embedding_model()
+            embedding = model.encode([text_for_embedding])[0].tolist()
+        except Exception as e:
+            logger.warning(
+                "Embedding model unavailable, indexing virtual server '%s' without embeddings: %s",
+                virtual_server.server_name,
+                e,
+            )
+            embedding = []
+
+        # Build tools array for search (similar to mcp_server)
+        tools = [
+            {
+                "name": mapping.alias or mapping.tool_name,
+                "description": mapping.description_override or "",
+                "backend_server": mapping.backend_server_path,
+            }
+            for mapping in virtual_server.tool_mappings
+        ]
+
+        # Get backend server paths for metadata
+        backend_paths = list(
+            {mapping.backend_server_path for mapping in virtual_server.tool_mappings}
+        )
+
+        # Build search document
+        search_doc = {
+            "_id": path,
+            "entity_type": "virtual_server",
+            "path": path,
+            "name": virtual_server.server_name,
+            "description": virtual_server.description or "",
+            "tags": virtual_server.tags or [],
+            "is_enabled": is_enabled,
+            "text_for_embedding": text_for_embedding,
+            "embedding": embedding,
+            "embedding_metadata": embedding_config.get_embedding_metadata(),
+            "tools": tools,
+            "metadata": {
+                "server_name": virtual_server.server_name,
+                "num_tools": len(virtual_server.tool_mappings),
+                "backend_count": len(backend_paths),
+                "backend_paths": backend_paths,
+                "required_scopes": virtual_server.required_scopes,
+                "supported_transports": virtual_server.supported_transports,
+                "created_by": virtual_server.created_by,
+            },
+            "indexed_at": virtual_server.updated_at or virtual_server.created_at,
+        }
+
+        # Upsert to search collection
+        try:
+            await collection.replace_one(
+                {"_id": path},
+                search_doc,
+                upsert=True
+            )
+            logger.info(f"Indexed virtual server for search: {path}")
+        except Exception as e:
+            logger.error(f"Failed to index virtual server in search: {e}", exc_info=True)
+
+
     def _calculate_cosine_similarity(
         self,
         vec1: list[float],
@@ -759,6 +861,7 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
             agents = []
             tools = []
             skills = []
+            virtual_servers = []
 
             for item in scored_docs:
                 doc = item["doc"]
@@ -772,9 +875,17 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
                     tools.append(item)
                 elif entity_type == "skill" and len(skills) < 3:
                     skills.append(item)
+                elif entity_type == "virtual_server" and len(virtual_servers) < 3:
+                    virtual_servers.append(item)
 
             # Format results to match the API contract
-            grouped_results = {"servers": [], "tools": [], "agents": [], "skills": []}
+            grouped_results = {
+                "servers": [],
+                "tools": [],
+                "agents": [],
+                "skills": [],
+                "virtual_servers": [],
+            }
 
             tool_count = 0
             for item in servers:
@@ -880,12 +991,35 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
                 }
                 grouped_results["skills"].append(result_entry)
 
+            for item in virtual_servers:
+                doc = item["doc"]
+                relevance_score = item["relevance_score"]
+                metadata = doc.get("metadata", {})
+                matching_tools = doc.get("_matching_tools", [])
+
+                result_entry = {
+                    "entity_type": "virtual_server",
+                    "path": doc.get("path"),
+                    "server_name": doc.get("name"),
+                    "description": doc.get("description"),
+                    "tags": doc.get("tags", []),
+                    "num_tools": metadata.get("num_tools", 0),
+                    "backend_count": metadata.get("backend_count", 0),
+                    "backend_paths": metadata.get("backend_paths", []),
+                    "is_enabled": doc.get("is_enabled", False),
+                    "relevance_score": relevance_score,
+                    "match_context": doc.get("description"),
+                    "matching_tools": matching_tools,
+                }
+                grouped_results["virtual_servers"].append(result_entry)
+
             logger.info(
                 f"Client-side search returned "
                 f"{len(grouped_results['servers'])} servers, "
                 f"{len(grouped_results['tools'])} tools, "
                 f"{len(grouped_results['agents'])} agents, "
-                f"{len(grouped_results['skills'])} skills "
+                f"{len(grouped_results['skills'])} skills, "
+                f"{len(grouped_results['virtual_servers'])} virtual_servers "
                 f"from {len(all_docs)} total documents (top 3 per type)"
             )
 
@@ -893,7 +1027,13 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
 
         except Exception as e:
             logger.error(f"Failed to perform client-side search: {e}", exc_info=True)
-            return {"servers": [], "tools": [], "agents": [], "skills": []}
+            return {
+                "servers": [],
+                "tools": [],
+                "agents": [],
+                "skills": [],
+                "virtual_servers": [],
+            }
 
 
     async def _lexical_only_search(
@@ -970,11 +1110,18 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
         Returns:
             Grouped search results dict with servers, tools, agents lists
         """
-        grouped_results = {"servers": [], "tools": [], "agents": [], "skills": []}
+        grouped_results = {
+            "servers": [],
+            "tools": [],
+            "agents": [],
+            "skills": [],
+            "virtual_servers": [],
+        }
         server_count = 0
         agent_count = 0
         tool_count = 0
         skill_count = 0
+        virtual_server_count = 0
 
         for doc in results:
             entity_type = doc.get("entity_type")
@@ -1073,6 +1220,26 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
                 }
                 grouped_results["skills"].append(result_entry)
                 skill_count += 1
+
+            elif entity_type == "virtual_server" and virtual_server_count < 3:
+                metadata = doc.get("metadata", {})
+                matching_tools = doc.get("matching_tools", [])
+                result_entry = {
+                    "entity_type": "virtual_server",
+                    "path": doc.get("path"),
+                    "server_name": doc.get("name"),
+                    "description": doc.get("description"),
+                    "tags": doc.get("tags", []),
+                    "num_tools": metadata.get("num_tools", 0),
+                    "backend_count": metadata.get("backend_count", 0),
+                    "backend_paths": metadata.get("backend_paths", []),
+                    "is_enabled": doc.get("is_enabled", False),
+                    "relevance_score": relevance_score,
+                    "match_context": doc.get("description"),
+                    "matching_tools": matching_tools,
+                }
+                grouped_results["virtual_servers"].append(result_entry)
+                virtual_server_count += 1
 
         return grouped_results
 
@@ -1307,11 +1474,18 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
             scored_results.sort(key=lambda x: x[1], reverse=True)
 
             # Group results: top 3 per entity type
-            grouped_results = {"servers": [], "tools": [], "agents": [], "skills": []}
+            grouped_results = {
+                "servers": [],
+                "tools": [],
+                "agents": [],
+                "skills": [],
+                "virtual_servers": [],
+            }
             server_count = 0
             agent_count = 0
             tool_count = 0
             skill_count = 0
+            virtual_server_count = 0
 
             for doc, relevance_score in scored_results:
                 entity_type = doc.get("entity_type")
@@ -1324,6 +1498,8 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
                 elif entity_type == "mcp_tool" and tool_count >= 3:
                     continue
                 elif entity_type == "skill" and skill_count >= 3:
+                    continue
+                elif entity_type == "virtual_server" and virtual_server_count >= 3:
                     continue
 
                 if entity_type == "mcp_server":
@@ -1424,6 +1600,26 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
                     grouped_results["skills"].append(result_entry)
                     skill_count += 1
 
+                elif entity_type == "virtual_server":
+                    metadata = doc.get("metadata", {})
+                    matching_tools = doc.get("matching_tools", [])
+                    result_entry = {
+                        "entity_type": "virtual_server",
+                        "path": doc.get("path"),
+                        "server_name": doc.get("name"),
+                        "description": doc.get("description"),
+                        "tags": doc.get("tags", []),
+                        "num_tools": metadata.get("num_tools", 0),
+                        "backend_count": metadata.get("backend_count", 0),
+                        "backend_paths": metadata.get("backend_paths", []),
+                        "is_enabled": doc.get("is_enabled", False),
+                        "relevance_score": relevance_score,
+                        "match_context": doc.get("description"),
+                        "matching_tools": matching_tools,
+                    }
+                    grouped_results["virtual_servers"].append(result_entry)
+                    virtual_server_count += 1
+
             # Sort each group by relevance_score (descending) to ensure highest matches
             # appear first. This is needed because the DB sorts by text_boost only,
             # but relevance_score combines both vector similarity and text boost.
@@ -1439,13 +1635,17 @@ class DocumentDBSearchRepository(SearchRepositoryBase):
             grouped_results["skills"].sort(
                 key=lambda x: x.get("relevance_score", 0), reverse=True
             )
+            grouped_results["virtual_servers"].sort(
+                key=lambda x: x.get("relevance_score", 0), reverse=True
+            )
 
             logger.info(
                 f"Hybrid search for '{query}' returned "
                 f"{len(grouped_results['servers'])} servers, "
                 f"{len(grouped_results['tools'])} tools, "
                 f"{len(grouped_results['agents'])} agents, "
-                f"{len(grouped_results['skills'])} skills (top 3 per type)"
+                f"{len(grouped_results['skills'])} skills, "
+                f"{len(grouped_results['virtual_servers'])} virtual_servers (top 3 per type)"
             )
 
             return grouped_results

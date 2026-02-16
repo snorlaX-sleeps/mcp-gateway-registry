@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-EntityType = Literal["mcp_server", "tool", "a2a_agent", "skill"]
+EntityType = Literal["mcp_server", "tool", "a2a_agent", "skill", "virtual_server"]
 
 
 def get_search_repo() -> SearchRepositoryBase:
@@ -104,6 +104,20 @@ class SkillSearchResult(BaseModel):
     match_context: str | None = None
 
 
+class VirtualServerSearchResult(BaseModel):
+    path: str
+    server_name: str
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    num_tools: int = 0
+    backend_count: int = 0
+    backend_paths: list[str] = Field(default_factory=list)
+    is_enabled: bool = False
+    relevance_score: float = Field(..., ge=0.0, le=1.0)
+    match_context: str | None = None
+    matching_tools: list[MatchingToolResult] = Field(default_factory=list)
+
+
 class SemanticSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=512, description="Natural language query")
     entity_types: list[EntityType] | None = Field(
@@ -123,10 +137,12 @@ class SemanticSearchResponse(BaseModel):
     tools: list[ToolSearchResult] = Field(default_factory=list)
     agents: list[AgentSearchResult] = Field(default_factory=list)
     skills: list[SkillSearchResult] = Field(default_factory=list)
+    virtual_servers: list[VirtualServerSearchResult] = Field(default_factory=list)
     total_servers: int = 0
     total_tools: int = 0
     total_agents: int = 0
     total_skills: int = 0
+    total_virtual_servers: int = 0
 
 
 async def _user_can_access_server(path: str, server_name: str, user_context: dict) -> bool:
@@ -390,6 +406,48 @@ async def semantic_search(
             )
         )
 
+    # Process virtual servers
+    filtered_virtual_servers: list[VirtualServerSearchResult] = []
+    for vs in raw_results.get("virtual_servers", []):
+        vs_path = vs.get("path", "")
+        if not vs_path:
+            continue
+
+        # Virtual servers use the same access control as regular servers
+        if not await _user_can_access_server(
+            vs_path,
+            vs.get("server_name", ""),
+            user_context,
+        ):
+            continue
+
+        matching_tools = [
+            MatchingToolResult(
+                tool_name=tool.get("tool_name", ""),
+                description=tool.get("description"),
+                relevance_score=tool.get("relevance_score", 0.0),
+                match_context=tool.get("match_context"),
+            )
+            for tool in vs.get("matching_tools", [])
+        ]
+
+        metadata = vs.get("metadata", {})
+        filtered_virtual_servers.append(
+            VirtualServerSearchResult(
+                path=vs_path,
+                server_name=vs.get("server_name", ""),
+                description=vs.get("description"),
+                tags=vs.get("tags", []),
+                num_tools=metadata.get("num_tools", 0),
+                backend_count=metadata.get("backend_count", 0),
+                backend_paths=metadata.get("backend_paths", []),
+                is_enabled=vs.get("is_enabled", False),
+                relevance_score=vs.get("relevance_score", 0.0),
+                match_context=vs.get("match_context"),
+                matching_tools=matching_tools,
+            )
+        )
+
     # Filter results based on registry mode
     # In skills-only mode, only return skills; in servers-only mode, only return servers, etc.
     mode = settings.registry_mode
@@ -399,8 +457,9 @@ async def semantic_search(
         filtered_servers = []
         filtered_tools = []
         filtered_agents = []
+        filtered_virtual_servers = []
     elif mode == RegistryMode.MCP_SERVERS_ONLY:
-        # Only servers and tools are enabled
+        # Only servers, tools, and virtual servers are enabled
         filtered_agents = []
         filtered_skills = []
     elif mode == RegistryMode.AGENTS_ONLY:
@@ -408,6 +467,7 @@ async def semantic_search(
         filtered_servers = []
         filtered_tools = []
         filtered_skills = []
+        filtered_virtual_servers = []
     # In FULL mode, return all results (no filtering needed)
 
     return SemanticSearchResponse(
@@ -416,8 +476,10 @@ async def semantic_search(
         tools=filtered_tools,
         agents=filtered_agents,
         skills=filtered_skills,
+        virtual_servers=filtered_virtual_servers,
         total_servers=len(filtered_servers),
         total_tools=len(filtered_tools),
         total_agents=len(filtered_agents),
         total_skills=len(filtered_skills),
+        total_virtual_servers=len(filtered_virtual_servers),
     )
