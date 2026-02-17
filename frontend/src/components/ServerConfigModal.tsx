@@ -4,7 +4,7 @@ import axios from 'axios';
 import type { Server } from './ServerCard';
 import { useRegistryConfig } from '../hooks/useRegistryConfig';
 
-type IDE = 'vscode' | 'cursor' | 'cline' | 'claude-code';
+type IDE = 'vscode' | 'cursor' | 'cline' | 'roo-code' | 'claude-code';
 
 interface ServerConfigModalProps {
   server: Server;
@@ -23,6 +23,7 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
   const [jwtToken, setJwtToken] = useState<string | null>(null);
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const { config: registryConfig, loading: configLoading } = useRegistryConfig();
 
   // Determine if we're in registry-only mode
@@ -145,6 +146,7 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
           },
         };
       case 'cline':
+      case 'roo-code':
         return {
           mcpServers: {
             [serverName]: {
@@ -195,6 +197,10 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
       const config = generateMCPConfig();
       const configText = JSON.stringify(config, null, 2);
       await navigator.clipboard.writeText(configText);
+
+      // Show visual feedback
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
 
       onShowToast?.('Configuration copied to clipboard!', 'success');
     } catch (error) {
@@ -323,7 +329,7 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
           <div className="bg-gray-50 dark:bg-gray-900 border dark:border-gray-700 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-3">Select your IDE/Tool:</h4>
             <div className="flex flex-wrap gap-2">
-              {(['vscode', 'cursor', 'cline', 'claude-code'] as IDE[]).map((ide) => (
+              {(['vscode', 'cursor', 'cline', 'roo-code', 'claude-code'] as IDE[]).map((ide) => (
                 <button
                   key={ide}
                   onClick={() => setSelectedIDE(ide)}
@@ -339,6 +345,8 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
                     ? 'Cursor'
                     : ide === 'cline'
                     ? 'Cline'
+                    : ide === 'roo-code'
+                    ? 'Roo Code'
                     : 'Claude Code'}
                 </button>
               ))}
@@ -351,6 +359,8 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
                 ? 'Cursor'
                 : selectedIDE === 'cline'
                 ? 'Cline'
+                : selectedIDE === 'roo-code'
+                ? 'Roo Code'
                 : 'Claude Code'}{' '}
               integration
             </p>
@@ -361,10 +371,14 @@ const ServerConfigModal: React.FC<ServerConfigModalProps> = ({
               <h4 className="font-medium text-gray-900 dark:text-white">Configuration JSON:</h4>
               <button
                 onClick={copyConfigToClipboard}
-                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
+                className={`flex items-center gap-2 px-3 py-2 text-white rounded-lg transition-colors duration-200 ${
+                  copied
+                    ? 'bg-green-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
               >
                 <ClipboardDocumentIcon className="h-4 w-4" />
-                Copy to Clipboard
+                {copied ? 'Copied!' : 'Copy to Clipboard'}
               </button>
             </div>
             <pre className="bg-gray-900 text-green-100 p-4 rounded-lg text-sm overflow-x-auto">
