@@ -1,14 +1,18 @@
 import logging
-from typing import Annotated, Literal
+from typing import (
+    Annotated,
+    Literal,
+)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from ..audit import set_audit_action
 from ..auth.dependencies import nginx_proxied_auth
-from ..core.config import settings, RegistryMode, DeploymentMode
+from ..core.config import DeploymentMode, RegistryMode, settings
 from ..repositories.factory import get_search_repository
 from ..repositories.interfaces import SearchRepositoryBase
+from ..schemas.virtual_server_models import VirtualServerConfig
 from ..services.agent_service import agent_service
 from ..services.server_service import server_service
 from ..services.virtual_server_service import get_virtual_server_service
@@ -33,8 +37,7 @@ class MatchingToolResult(BaseModel):
     relevance_score: float = Field(0.0, ge=0.0, le=1.0)
     match_context: str | None = None
     inputSchema: dict | None = Field(
-        default=None,
-        description="JSON Schema for tool input parameters"
+        default=None, description="JSON Schema for tool input parameters"
     )
 
 
@@ -104,25 +107,18 @@ class ServerSearchResult(BaseModel):
     sync_metadata: SyncMetadata | None = None
     # Endpoint URL for agent connectivity (computed based on deployment mode)
     endpoint_url: str | None = Field(
-        default=None,
-        description="URL for agents to connect to this MCP server"
+        default=None, description="URL for agents to connect to this MCP server"
     )
     # Raw endpoint fields (for advanced use cases)
     proxy_pass_url: str | None = Field(
-        default=None,
-        description="Base URL for the MCP server backend (internal)"
+        default=None, description="Base URL for the MCP server backend (internal)"
     )
     mcp_endpoint: str | None = Field(
-        default=None,
-        description="Explicit streamable-http endpoint URL (if set)"
+        default=None, description="Explicit streamable-http endpoint URL (if set)"
     )
-    sse_endpoint: str | None = Field(
-        default=None,
-        description="Explicit SSE endpoint URL (if set)"
-    )
+    sse_endpoint: str | None = Field(default=None, description="Explicit SSE endpoint URL (if set)")
     supported_transports: list[str] = Field(
-        default_factory=list,
-        description="Supported transport types (e.g., streamable-http, sse)"
+        default_factory=list, description="Supported transport types (e.g., streamable-http, sse)"
     )
 
 
@@ -136,8 +132,7 @@ class ToolSearchResult(BaseModel):
     match_context: str | None = None
     # Endpoint URL for the parent MCP server
     endpoint_url: str | None = Field(
-        default=None,
-        description="URL for agents to connect to the parent MCP server"
+        default=None, description="URL for agents to connect to the parent MCP server"
     )
 
 
@@ -186,8 +181,7 @@ class VirtualServerSearchResult(BaseModel):
     matching_tools: list[MatchingToolResult] = Field(default_factory=list)
     # Endpoint URL for agent connectivity (computed based on deployment mode)
     endpoint_url: str | None = Field(
-        default=None,
-        description="URL for agents to connect to this virtual MCP server"
+        default=None, description="URL for agents to connect to this virtual MCP server"
     )
 
 
@@ -221,26 +215,30 @@ class SemanticSearchResponse(BaseModel):
 async def _get_tool_schema_for_virtual_server(
     vs_path: str,
     tool_name: str,
+    vs_config: VirtualServerConfig | None = None,
 ) -> dict | None:
     """Look up tool schema from backend server for a virtual server's tool.
 
     Args:
         vs_path: Virtual server path
-        tool_name: Name of the tool to look up
+        tool_name: Name of the tool to look up (can be the original name or alias)
+        vs_config: Optional pre-fetched VirtualServerConfig to avoid repeated lookups
 
     Returns:
         Tool inputSchema dict if found, None otherwise
     """
     try:
-        vs_service = get_virtual_server_service()
-        vs_config = await vs_service.get_virtual_server(vs_path)
+        if vs_config is None:
+            vs_service = get_virtual_server_service()
+            vs_config = await vs_service.get_virtual_server(vs_path)
+
         if not vs_config:
             return None
 
-        # Find the tool mapping for this tool
+        # Find the tool mapping for this tool (check both tool_name and alias)
         tool_mapping = None
         for tm in vs_config.tool_mappings:
-            if tm.tool_name == tool_name:
+            if tm.tool_name == tool_name or tm.alias == tool_name:
                 tool_mapping = tm
                 break
 
@@ -256,10 +254,10 @@ async def _get_tool_schema_for_virtual_server(
         if not server_info:
             return None
 
-        # Find the tool in the backend's tool list
+        # Find the tool in the backend's tool list using the original tool name
         tool_list = server_info.get("tool_list", [])
         for tool in tool_list:
-            if tool.get("name") == tool_name:
+            if tool.get("name") == tool_mapping.tool_name:
                 return tool.get("schema") or tool.get("inputSchema")
 
         return None
@@ -400,7 +398,9 @@ async def semantic_search(
     # Extract base URL from request for endpoint URL computation
     # Use X-Forwarded-Proto and X-Forwarded-Host if behind proxy, otherwise use request URL
     forwarded_proto = http_request.headers.get("x-forwarded-proto", "https")
-    forwarded_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
+    forwarded_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get(
+        "host"
+    )
     if forwarded_host:
         base_url = f"{forwarded_proto}://{forwarded_host}"
     else:
@@ -560,6 +560,7 @@ async def semantic_search(
 
     # Process virtual servers
     filtered_virtual_servers: list[VirtualServerSearchResult] = []
+    vs_service = get_virtual_server_service()
     for vs in raw_results.get("virtual_servers", []):
         vs_path = vs.get("path", "")
         if not vs_path:
@@ -573,21 +574,58 @@ async def semantic_search(
         ):
             continue
 
-        # Build matching tools with schema lookup from backend servers
+        # Get all tools from the virtual server configuration
+        # This ensures we show all tools when a virtual server matches,
+        # not just the ones that matched by keyword
         matching_tools: list[MatchingToolResult] = []
-        for tool in vs.get("matching_tools", []):
-            tool_name = tool.get("tool_name", "")
-            # Look up the tool schema from the backend server
-            input_schema = await _get_tool_schema_for_virtual_server(vs_path, tool_name)
-            matching_tools.append(
-                MatchingToolResult(
-                    tool_name=tool_name,
-                    description=tool.get("description"),
-                    relevance_score=tool.get("relevance_score", 0.0),
-                    match_context=tool.get("match_context"),
-                    inputSchema=input_schema,
+        raw_matching_tools = vs.get("matching_tools", [])
+
+        try:
+            vs_config = await vs_service.get_virtual_server(vs_path)
+            if vs_config and vs_config.tool_mappings:
+                for tm in vs_config.tool_mappings:
+                    tool_name = tm.alias or tm.tool_name
+
+                    # Look up the tool schema from the backend server
+                    # Pass vs_config to avoid repeated lookups
+                    input_schema = await _get_tool_schema_for_virtual_server(
+                        vs_path, tm.tool_name, vs_config
+                    )
+
+                    # Find match info from raw_matching_tools if available
+                    # Tools that matched the query will have higher relevance score
+                    match_info = next(
+                        (t for t in raw_matching_tools if t.get("tool_name", "") == tool_name), None
+                    )
+
+                    matching_tools.append(
+                        MatchingToolResult(
+                            tool_name=tool_name,
+                            description=tm.description_override or "",
+                            relevance_score=match_info.get("relevance_score", 0.8)
+                            if match_info
+                            else 0.8,
+                            match_context=match_info.get("match_context")
+                            if match_info
+                            else f"Tool: {tool_name}",
+                            inputSchema=input_schema,
+                        )
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to get tools for virtual server {vs_path}: {e}")
+            # Fallback to raw matching tools
+            for tool in raw_matching_tools:
+                tool_name = tool.get("tool_name", "")
+                input_schema = await _get_tool_schema_for_virtual_server(vs_path, tool_name)
+                matching_tools.append(
+                    MatchingToolResult(
+                        tool_name=tool_name,
+                        description=tool.get("description"),
+                        relevance_score=tool.get("relevance_score", 0.0),
+                        match_context=tool.get("match_context"),
+                        inputSchema=input_schema,
+                    )
                 )
-            )
 
         # Compute endpoint URL for virtual server
         vs_endpoint_url = _compute_endpoint_url(
