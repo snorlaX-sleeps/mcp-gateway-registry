@@ -62,15 +62,7 @@ jobs:
       run: |
         uv run python scripts/test.py check
 
-    - name: Run unit tests
-      run: |
-        uv run python scripts/test.py unit -n auto
-
-    - name: Run integration tests
-      run: |
-        uv run python scripts/test.py integration -n auto
-
-    - name: Generate coverage report
+    - name: Run all tests with coverage
       run: |
         uv run python scripts/test.py coverage -n auto
 
