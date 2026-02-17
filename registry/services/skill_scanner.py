@@ -32,7 +32,14 @@ class SkillScannerService:
     def __init__(self) -> None:
         """Initialize the skill scanner service."""
         self._ensure_output_directory()
-        self._scan_repo = get_skill_security_scan_repository()
+        self._scan_repo = None
+
+    @property
+    def scan_repo(self):
+        """Lazy-load the scan repository."""
+        if self._scan_repo is None:
+            self._scan_repo = get_skill_security_scan_repository()
+        return self._scan_repo
 
     def _ensure_output_directory(self) -> Path:
         """Ensure output directory exists."""
@@ -109,7 +116,7 @@ class SkillScannerService:
                 scan_failed=False,
             )
 
-            await self._scan_repo.create(result.model_dump())
+            await self.scan_repo.create(result.model_dump())
 
             logger.info(
                 f"Skill security scan completed for {skill_path}. "
@@ -132,7 +139,7 @@ class SkillScannerService:
                 error_message=str(e),
             )
 
-            await self._scan_repo.create(result.model_dump())
+            await self.scan_repo.create(result.model_dump())
             return result
 
     def _run_skill_scanner(
@@ -310,7 +317,7 @@ class SkillScannerService:
             Dictionary containing scan results, or None if no scan found
         """
         try:
-            scan_result = await self._scan_repo.get_latest(skill_path)
+            scan_result = await self.scan_repo.get_latest(skill_path)
             if scan_result:
                 if hasattr(scan_result, "model_dump"):
                     return scan_result.model_dump()

@@ -419,6 +419,7 @@ def mock_security_scan_repository():
 
 
 @pytest.fixture
+@pytest.fixture
 def mock_virtual_server_repository():
     """
     Mock virtual server repository to avoid DocumentDB access.
@@ -457,6 +458,24 @@ def mock_backend_session_repository():
     return mock
 
 
+@pytest.fixture
+def mock_skill_security_scan_repository():
+    """
+    Mock skill security scan repository to avoid DocumentDB access.
+
+    Returns:
+        AsyncMock instance with common skill security scan methods
+    """
+    mock = AsyncMock()
+    mock.create.return_value = True
+    mock.get_latest.return_value = None
+    mock.get.return_value = None
+    mock.list_all.return_value = []
+    mock.query_by_status.return_value = []
+    mock.load_all.return_value = None
+    return mock
+
+
 @pytest.fixture(autouse=True)
 def mock_all_repositories(
     mock_scope_repository,
@@ -467,6 +486,7 @@ def mock_all_repositories(
     mock_security_scan_repository,
     mock_virtual_server_repository,
     mock_backend_session_repository,
+    mock_skill_security_scan_repository,
 ):
     """
     Auto-mock all repository factory functions to prevent DocumentDB access.
@@ -496,7 +516,8 @@ def mock_all_repositories(
          patch('registry.repositories.factory.get_federation_config_repository', return_value=mock_federation_config_repository), \
          patch('registry.repositories.factory.get_security_scan_repository', return_value=mock_security_scan_repository), \
          patch('registry.repositories.factory.get_virtual_server_repository', return_value=mock_virtual_server_repository), \
-         patch('registry.repositories.factory.get_backend_session_repository', return_value=mock_backend_session_repository):
+         patch('registry.repositories.factory.get_backend_session_repository', return_value=mock_backend_session_repository), \
+         patch('registry.repositories.factory.get_skill_security_scan_repository', return_value=mock_skill_security_scan_repository):
         logger.debug("Auto-mocked all repository factory functions")
         yield
 

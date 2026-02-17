@@ -56,6 +56,8 @@ def _create_service() -> SkillScannerService:
         mock_repo.get_latest = MagicMock(return_value=None)
         mock_factory.return_value = mock_repo
         service = SkillScannerService()
+        # Force the lazy property to use our mock
+        service._scan_repo = mock_repo
     return service
 
 

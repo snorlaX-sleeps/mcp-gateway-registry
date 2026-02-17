@@ -7,7 +7,6 @@ Tests for skill security scan API endpoints and registration integration.
 **Validates: Requirements 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 4.5, 8.4**
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -91,7 +90,8 @@ class TestUnsafeSkillDisablingAndTagging:
 
     @given(scan_result=_unsafe_result_strategy())
     @settings(max_examples=50)
-    def test_unsafe_skill_disabled_and_tagged(self, scan_result):
+    @pytest.mark.asyncio
+    async def test_unsafe_skill_disabled_and_tagged(self, scan_result):
         """When scan is unsafe and blocking is enabled, skill is disabled and tagged."""
         from registry.api.skill_routes import _perform_skill_security_scan_on_registration
 
@@ -106,21 +106,15 @@ class TestUnsafeSkillDisablingAndTagging:
         mock_config.block_unsafe_skills = True
         mock_config.add_security_pending_tag = True
 
-        with patch(
-            "registry.api.skill_routes.skill_scanner_service",
-            create=True,
-        ) as mock_scanner:
-            mock_scanner.get_scan_config.return_value = mock_config
-            mock_scanner.scan_skill = AsyncMock(return_value=scan_result)
+        mock_scanner = MagicMock()
+        mock_scanner.get_scan_config.return_value = mock_config
+        mock_scanner.scan_skill = AsyncMock(return_value=scan_result)
 
-            # Patch the import inside the function
-            with patch(
-                "registry.services.skill_scanner.skill_scanner_service",
-                mock_scanner,
-            ):
-                asyncio.get_event_loop().run_until_complete(
-                    _perform_skill_security_scan_on_registration(mock_skill, mock_service)
-                )
+        with patch(
+            "registry.services.skill_scanner.skill_scanner_service",
+            mock_scanner,
+        ):
+            await _perform_skill_security_scan_on_registration(mock_skill, mock_service)
 
         mock_service.toggle_skill.assert_called_once_with(scan_result.skill_path, enabled=False)
         mock_service.update_skill.assert_called_once()
@@ -129,14 +123,15 @@ class TestUnsafeSkillDisablingAndTagging:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for API endpoints (Task 8.5)
+# Unit tests for API endpoints
 # ---------------------------------------------------------------------------
 
 
 class TestGetSkillSecurityScan:
     """Tests for GET /api/skills/{path}/security-scan."""
 
-    def test_returns_scan_result_when_exists(self):
+    @pytest.mark.asyncio
+    async def test_returns_scan_result_when_exists(self):
         """Returns scan result for a skill with existing scan data."""
         from registry.api.skill_routes import get_skill_security_scan
 
@@ -151,18 +146,17 @@ class TestGetSkillSecurityScan:
 
         user_context = {"is_admin": True, "username": "admin", "groups": []}
 
-        with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service):
-            with patch("registry.services.skill_scanner.skill_scanner_service", mock_scanner):
-                result = asyncio.get_event_loop().run_until_complete(
-                    get_skill_security_scan(
-                        user_context=user_context,
-                        skill_path="test-skill",
-                    )
-                )
+        with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service), \
+             patch("registry.services.skill_scanner.skill_scanner_service", mock_scanner):
+            result = await get_skill_security_scan(
+                user_context=user_context,
+                skill_path="test-skill",
+            )
 
         assert result["is_safe"] is True
 
-    def test_returns_no_results_message_when_none(self):
+    @pytest.mark.asyncio
+    async def test_returns_no_results_message_when_none(self):
         """Returns message when no scan results exist."""
         from registry.api.skill_routes import get_skill_security_scan
 
@@ -175,18 +169,17 @@ class TestGetSkillSecurityScan:
 
         user_context = {"is_admin": True, "username": "admin", "groups": []}
 
-        with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service):
-            with patch("registry.services.skill_scanner.skill_scanner_service", mock_scanner):
-                result = asyncio.get_event_loop().run_until_complete(
-                    get_skill_security_scan(
-                        user_context=user_context,
-                        skill_path="test-skill",
-                    )
-                )
+        with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service), \
+             patch("registry.services.skill_scanner.skill_scanner_service", mock_scanner):
+            result = await get_skill_security_scan(
+                user_context=user_context,
+                skill_path="test-skill",
+            )
 
         assert "No security scan results available" in result["message"]
 
-    def test_returns_404_for_nonexistent_skill(self):
+    @pytest.mark.asyncio
+    async def test_returns_404_for_nonexistent_skill(self):
         """Returns 404 when skill does not exist."""
         from fastapi import HTTPException
         from registry.api.skill_routes import get_skill_security_scan
@@ -198,11 +191,9 @@ class TestGetSkillSecurityScan:
 
         with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.get_event_loop().run_until_complete(
-                    get_skill_security_scan(
-                        user_context=user_context,
-                        skill_path="nonexistent",
-                    )
+                await get_skill_security_scan(
+                    user_context=user_context,
+                    skill_path="nonexistent",
                 )
 
         assert exc_info.value.status_code == 404
@@ -211,7 +202,8 @@ class TestGetSkillSecurityScan:
 class TestRescanSkill:
     """Tests for POST /api/skills/{path}/rescan."""
 
-    def test_non_admin_returns_403(self):
+    @pytest.mark.asyncio
+    async def test_non_admin_returns_403(self):
         """Non-admin user gets 403 on rescan."""
         from fastapi import HTTPException
         from registry.api.skill_routes import rescan_skill
@@ -220,17 +212,16 @@ class TestRescanSkill:
         mock_request = MagicMock()
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.get_event_loop().run_until_complete(
-                rescan_skill(
-                    http_request=mock_request,
-                    user_context=user_context,
-                    skill_path="test-skill",
-                )
+            await rescan_skill(
+                http_request=mock_request,
+                user_context=user_context,
+                skill_path="test-skill",
             )
 
         assert exc_info.value.status_code == 403
 
-    def test_returns_404_for_nonexistent_skill(self):
+    @pytest.mark.asyncio
+    async def test_returns_404_for_nonexistent_skill(self):
         """Returns 404 when skill does not exist."""
         from fastapi import HTTPException
         from registry.api.skill_routes import rescan_skill
@@ -243,12 +234,10 @@ class TestRescanSkill:
 
         with patch("registry.api.skill_routes.get_skill_service", return_value=mock_service):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.get_event_loop().run_until_complete(
-                    rescan_skill(
-                        http_request=mock_request,
-                        user_context=user_context,
-                        skill_path="nonexistent",
-                    )
+                await rescan_skill(
+                    http_request=mock_request,
+                    user_context=user_context,
+                    skill_path="nonexistent",
                 )
 
         assert exc_info.value.status_code == 404
@@ -257,7 +246,8 @@ class TestRescanSkill:
 class TestRegistrationWithScanning:
     """Tests for scan-on-registration behavior."""
 
-    def test_scanning_skipped_when_disabled(self):
+    @pytest.mark.asyncio
+    async def test_scanning_skipped_when_disabled(self):
         """Security scan is skipped when scan_on_registration is disabled."""
         from registry.api.skill_routes import _perform_skill_security_scan_on_registration
 
@@ -268,24 +258,20 @@ class TestRegistrationWithScanning:
         mock_config.enabled = True
         mock_config.scan_on_registration = False
 
-        with patch(
-            "registry.api.skill_routes.skill_scanner_service",
-            create=True,
-        ) as mock_scanner:
-            mock_scanner.get_scan_config.return_value = mock_config
-            mock_scanner.scan_skill = AsyncMock()
+        mock_scanner = MagicMock()
+        mock_scanner.get_scan_config.return_value = mock_config
+        mock_scanner.scan_skill = AsyncMock()
 
-            with patch(
-                "registry.services.skill_scanner.skill_scanner_service",
-                mock_scanner,
-            ):
-                asyncio.get_event_loop().run_until_complete(
-                    _perform_skill_security_scan_on_registration(mock_skill, mock_service)
-                )
+        with patch(
+            "registry.services.skill_scanner.skill_scanner_service",
+            mock_scanner,
+        ):
+            await _perform_skill_security_scan_on_registration(mock_skill, mock_service)
 
         mock_scanner.scan_skill.assert_not_called()
 
-    def test_safe_skill_not_disabled(self):
+    @pytest.mark.asyncio
+    async def test_safe_skill_not_disabled(self):
         """Safe skill is not disabled after scan."""
         from registry.api.skill_routes import _perform_skill_security_scan_on_registration
 
@@ -301,19 +287,14 @@ class TestRegistrationWithScanning:
         mock_config.block_unsafe_skills = True
         mock_config.add_security_pending_tag = True
 
-        with patch(
-            "registry.api.skill_routes.skill_scanner_service",
-            create=True,
-        ) as mock_scanner:
-            mock_scanner.get_scan_config.return_value = mock_config
-            mock_scanner.scan_skill = AsyncMock(return_value=safe_result)
+        mock_scanner = MagicMock()
+        mock_scanner.get_scan_config.return_value = mock_config
+        mock_scanner.scan_skill = AsyncMock(return_value=safe_result)
 
-            with patch(
-                "registry.services.skill_scanner.skill_scanner_service",
-                mock_scanner,
-            ):
-                asyncio.get_event_loop().run_until_complete(
-                    _perform_skill_security_scan_on_registration(mock_skill, mock_service)
-                )
+        with patch(
+            "registry.services.skill_scanner.skill_scanner_service",
+            mock_scanner,
+        ):
+            await _perform_skill_security_scan_on_registration(mock_skill, mock_service)
 
         mock_service.toggle_skill.assert_not_called()
