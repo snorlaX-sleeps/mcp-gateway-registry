@@ -6,8 +6,11 @@ For the full design and architecture details, see [Virtual MCP Server Design Doc
 
 ## Video Demo
 
-<!-- TODO: Add video demo showing Virtual MCP Server operations in the UI -->
-_Video demo coming soon - demonstrating virtual server creation, configuration, and management through the web UI._
+Watch the video demonstration of Virtual MCP Server creation and management through the web UI:
+
+[![Virtual MCP Server Demo](https://img.shields.io/badge/Watch-Video%20Demo-red?style=for-the-badge&logo=youtube)](https://app.vidcast.io/share/954e6296-f217-4559-8d86-88cec25af763)
+
+[View Video Demo](https://app.vidcast.io/share/954e6296-f217-4559-8d86-88cec25af763)
 
 ## Prerequisites
 
