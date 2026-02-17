@@ -139,6 +139,8 @@ class VirtualServerConfig:
     tags: List[str]
     supported_transports: List[str]    # Default: ["streamable-http"]
     is_enabled: bool                   # Controls nginx routing
+    num_stars: float                   # Average rating (0.0-5.0)
+    rating_details: List[dict]         # Individual ratings [{user, rating}]
     created_by: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -486,9 +488,128 @@ These endpoints are marked `internal` in nginx and are only accessible from Lua 
 
 Virtual server paths must match the pattern `/virtual/{slug}` where `slug` is lowercase alphanumeric with hyphens. Path traversal attacks are prevented by normalizing and validating paths before any database or filesystem operation.
 
+### Rating Endpoints
+
+Virtual servers support user ratings (1-5 stars):
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/virtual-servers/{path}/rate` | User | Submit or update a rating |
+| `GET` | `/api/virtual-servers/{path}/rating` | User | Get rating info for a virtual server |
+
+**Rating Request:**
+```json
+{
+  "rating": 4
+}
+```
+
+**Rating Response:**
+```json
+{
+  "average_rating": 4.2,
+  "message": "Rating submitted successfully"
+}
+```
+
+**Get Rating Response:**
+```json
+{
+  "num_stars": 4.2,
+  "rating_details": [
+    {"user": "alice", "rating": 5},
+    {"user": "bob", "rating": 4}
+  ]
+}
+```
+
 ---
 
-## 10. Frontend Management UI
+## 10. Search and Discovery
+
+Virtual servers are indexed for semantic search alongside regular MCP servers and A2A agents.
+
+### Indexed Fields
+
+The following fields are included in the vector embedding for semantic search:
+
+- Server name
+- Description
+- Tags (prefixed with "Tags: ")
+- Tool names (alias or original name from each tool mapping)
+- Tool description overrides
+
+### Search Collection
+
+Virtual servers are stored in the unified `mcp_embeddings_{dimensions}` collection (e.g., `mcp_embeddings_384` for 384-dimension models) with `entity_type: "virtual_server"`. This enables cross-entity search queries that return servers, agents, and virtual servers in a single response. The dimension suffix matches the configured embedding model (384 for sentence-transformers, 1536 for OpenAI/Bedrock Titan).
+
+### Search Document Structure
+
+```json
+{
+  "_id": "/virtual/dev-tools",
+  "entity_type": "virtual_server",
+  "path": "/virtual/dev-tools",
+  "name": "Dev Tools",
+  "description": "Aggregated development tools",
+  "tags": ["development", "tools"],
+  "is_enabled": true,
+  "tools": [
+    {"name": "github_search"},
+    {"name": "jira_search"}
+  ],
+  "embedding": [0.12, -0.34, ...],
+  "metadata": {
+    "server_name": "Dev Tools",
+    "num_tools": 5,
+    "backend_count": 2,
+    "backend_paths": ["/github", "/jira"],
+    "required_scopes": ["mcp-access"],
+    "supported_transports": ["streamable-http"],
+    "created_by": "admin"
+  }
+}
+```
+
+### Search Result Format
+
+When virtual servers match a search query, they appear in the `virtual_servers` array:
+
+```json
+{
+  "servers": [...],
+  "agents": [...],
+  "virtual_servers": [
+    {
+      "entity_type": "virtual_server",
+      "path": "/virtual/dev-tools",
+      "server_name": "Dev Tools",
+      "description": "Aggregated development tools",
+      "relevance_score": 0.85,
+      "tags": ["development", "tools"],
+      "backend_paths": ["/github", "/jira"],
+      "tool_count": 5,
+      "matching_tools": [
+        {"tool_name": "github_search"}
+      ]
+    }
+  ],
+  "tools": [...],
+  "skills": [...]
+}
+```
+
+### Indexing Lifecycle
+
+Virtual servers are indexed/re-indexed when:
+- Created via `POST /api/virtual-servers`
+- Updated via `PUT /api/virtual-servers/{path}`
+- Toggled via `POST /api/virtual-servers/{path}/toggle`
+- Deleted (removed from search index)
+
+---
+
+## 11. Frontend Management UI
 
 The management UI provides a multi-step wizard for creating and editing virtual servers:
 
@@ -515,7 +636,7 @@ Virtual servers appear on the main dashboard alongside regular MCP servers. They
 
 ---
 
-## 11. Validation and Error Handling
+## 12. Validation and Error Handling
 
 ### Creation-Time Validation
 
@@ -542,7 +663,7 @@ When a virtual server is created or updated, the service layer performs the foll
 
 ---
 
-## 12. Performance Characteristics
+## 13. Performance Characteristics
 
 ### Caching Strategy
 
@@ -571,7 +692,7 @@ Virtual server routing adds overhead compared to direct backend access due to se
 
 ---
 
-## 13. Deployment Considerations
+## 14. Deployment Considerations
 
 ### Multi-Instance Behavior
 
@@ -603,7 +724,7 @@ This approach is simple and correct but means all virtual server mutations are s
 
 ---
 
-## 14. Limitations and Future Work
+## 15. Limitations and Future Work
 
 ### Current Limitations
 
@@ -623,7 +744,7 @@ This approach is simple and correct but means all virtual server mutations are s
 
 ---
 
-## 15. File Reference
+## 16. File Reference
 
 ```
 registry/
