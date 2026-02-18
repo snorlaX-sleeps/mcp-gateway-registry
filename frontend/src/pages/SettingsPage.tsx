@@ -7,9 +7,13 @@ import {
   GlobeAltIcon,
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
+  CogIcon,
+  ServerStackIcon,
 } from '@heroicons/react/24/outline';
 import FederationPeers from '../components/FederationPeers';
 import FederationPeerForm from '../components/FederationPeerForm';
+import ConfigPanel from '../components/ConfigPanel';
+import VirtualServerList from '../components/VirtualServerList';
 import AuditLogsPage from './AuditLogsPage';
 import IAMGroups from '../components/IAMGroups';
 import IAMUsers from '../components/IAMUsers';
@@ -36,6 +40,7 @@ interface SettingsCategory {
   icon: React.ReactNode;
   items: SettingsItem[];
   disabled?: boolean; // Greyed out, not clickable -- for future categories
+  adminOnly?: boolean; // Visible only to admins
 }
 
 /**
@@ -69,6 +74,14 @@ const SETTINGS_CATEGORIES: SettingsCategory[] = [
     ],
   },
   {
+    id: 'virtual-mcp',
+    label: 'Virtual MCP',
+    icon: <ServerStackIcon className="h-5 w-5" />,
+    items: [
+      { id: 'servers', label: 'Virtual Servers', path: '/settings/virtual-mcp/servers' },
+    ],
+  },
+  {
     id: 'iam',
     label: 'IAM',
     icon: <UsersIcon className="h-5 w-5" />,
@@ -79,18 +92,20 @@ const SETTINGS_CATEGORIES: SettingsCategory[] = [
     ],
   },
   {
-    id: 'virtual-mcp',
-    label: 'Virtual MCP',
-    icon: <GlobeAltIcon className="h-5 w-5" />,
-    items: [],
-    disabled: true,
-  },
-  {
     id: 'notifications',
     label: 'Notifications',
     icon: <ClipboardDocumentListIcon className="h-5 w-5" />,
     items: [],
     disabled: true,
+  },
+  {
+    id: 'system-config',
+    label: 'System Config',
+    icon: <CogIcon className="h-5 w-5" />,
+    items: [
+      { id: 'configuration', label: 'Configuration', path: '/settings/system-config/configuration' },
+    ],
+    adminOnly: true,
   },
 ];
 
@@ -109,10 +124,19 @@ const SettingsPage: React.FC = () => {
   // All settings categories require admin -- no per-category filtering
   const visibleCategories = canAccessSettings(user) ? SETTINGS_CATEGORIES : [];
 
-  // Track which categories are expanded
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(['audit']) // Audit expanded by default
-  );
+  // Track which categories are expanded - auto-expand based on current path
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => {
+    const initial = new Set(['audit']);
+    // Auto-expand the category matching the current route
+    for (const category of SETTINGS_CATEGORIES) {
+      for (const item of category.items) {
+        if (location.pathname.startsWith(item.path) || location.pathname.startsWith(`/settings/${category.id}`)) {
+          initial.add(category.id);
+        }
+      }
+    }
+    return initial;
+  });
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState>({
@@ -213,6 +237,16 @@ const SettingsPage: React.FC = () => {
     const editMatch = path.match(/^\/settings\/federation\/peers\/([^/]+)\/edit$/);
     if (editMatch) {
       return <FederationPeerForm peerId={editMatch[1]} onShowToast={showToast} />;
+    }
+
+    // Virtual MCP > Servers
+    if (path === '/settings/virtual-mcp/servers' || path === '/settings/virtual-mcp') {
+      return <VirtualServerList onShowToast={showToast} />;
+    }
+
+    // System Config > Configuration
+    if (path === '/settings/system-config/configuration' || path === '/settings/system-config') {
+      return <ConfigPanel showToast={showToast} />;
     }
 
     // IAM > Groups
