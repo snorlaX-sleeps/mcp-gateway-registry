@@ -6,7 +6,7 @@
 ## Scope of Responsibility
 
 - **Module**: `/registry/`
-- **Technology Stack**: FastAPI, Pydantic, FAISS, Python 3.12
+- **Technology Stack**: FastAPI, Pydantic, FAISS, Python
 - **Primary Focus**: REST APIs, data models, business logic, semantic search
 
 ## Key Evaluation Areas

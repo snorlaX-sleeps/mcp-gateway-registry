@@ -6,7 +6,7 @@
 ## Scope of Responsibility
 
 - **Module**: `/frontend/`
-- **Technology Stack**: React 18, TypeScript, Tailwind CSS, Axios
+- **Technology Stack**: React, TypeScript, Tailwind CSS, Axios
 - **Primary Focus**: User interface, user experience, client-side functionality
 
 ## Key Evaluation Areas

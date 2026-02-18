@@ -650,14 +650,14 @@ Add to `registry/core/config.py`:
 
 | Package | Version | Purpose | Added By |
 |---------|---------|---------|----------|
-| `package-name` | `>=1.0.0` | {Why needed} | Backend |
-| `another-package` | `~=2.0` | {Why needed} | Frontend |
+| `package-name` | `latest` | {Why needed} | Backend |
+| `another-package` | `latest` | {Why needed} | Frontend |
 
 ### Adding Dependencies
 
 ```bash
 # Add to pyproject.toml
-uv add package-name>=1.0.0
+uv add package-name
 ```
 
 ### No New Dependencies
@@ -957,7 +957,7 @@ Create a review document with feedback from multiple expert personas:
 
 | Library | Version | Purpose | Justification |
 |---------|---------|---------|---------------|
-| `library-name` | `^1.0.0` | {What it does} | {Why it's needed vs alternatives} |
+| `library-name` | `latest` | {What it does} | {Why it's needed vs alternatives} |
 | None | - | - | No new frontend dependencies required |
 
 #### Better Alternatives Considered
@@ -992,7 +992,7 @@ Create a review document with feedback from multiple expert personas:
 
 | Library | Version | Purpose | Justification |
 |---------|---------|---------|---------------|
-| `library-name` | `>=1.0.0` | {What it does} | {Why it's needed vs alternatives} |
+| `library-name` | `latest` | {What it does} | {Why it's needed vs alternatives} |
 | None | - | - | No new backend dependencies required |
 
 #### Better Alternatives Considered
