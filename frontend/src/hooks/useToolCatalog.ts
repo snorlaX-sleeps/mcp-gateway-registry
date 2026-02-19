@@ -13,6 +13,7 @@ export interface ServerInfo {
   path: string;
   name: string;
   description: string;
+  type: 'mcp' | 'virtual';
 }
 
 export interface ToolInfo {
@@ -27,6 +28,16 @@ interface ServerListResponse {
     server_name?: string;
     name?: string;
     description?: string;
+    [key: string]: unknown;
+  }>;
+}
+
+interface VirtualServerListResponse {
+  virtual_servers: Array<{
+    path: string;
+    name: string;
+    description?: string;
+    enabled?: boolean;
     [key: string]: unknown;
   }>;
 }
@@ -60,6 +71,7 @@ interface UseServerToolsReturn {
 
 /**
  * Hook to fetch all available servers with descriptions.
+ * Includes both regular MCP servers and virtual servers.
  */
 export function useServerList(): UseServerListReturn {
   const [servers, setServers] = useState<ServerInfo[]>([]);
@@ -71,19 +83,42 @@ export function useServerList(): UseServerListReturn {
     setError(null);
 
     try {
-      const response = await axios.get<ServerListResponse>('/api/servers');
-      const data = response.data;
+      // Fetch both regular servers and virtual servers in parallel
+      const [serversResponse, virtualServersResponse] = await Promise.all([
+        axios.get<ServerListResponse>('/api/servers'),
+        axios.get<VirtualServerListResponse>('/api/virtual-servers'),
+      ]);
 
-      const serverList: ServerInfo[] = (data.servers || []).map((s) => ({
+      // Map regular MCP servers
+      const mcpServers: ServerInfo[] = (serversResponse.data.servers || []).map((s) => ({
         path: s.path,
         name: s.server_name || s.name || s.path,
         description: s.description || '',
+        type: 'mcp' as const,
       }));
 
-      // Sort by name
-      serverList.sort((a, b) => a.name.localeCompare(b.name));
+      // Map virtual servers (only enabled ones)
+      const virtualServers: ServerInfo[] = (virtualServersResponse.data.virtual_servers || [])
+        .filter((vs) => vs.enabled !== false)
+        .map((vs) => ({
+          path: vs.path,
+          name: vs.name || vs.path,
+          description: vs.description || '',
+          type: 'virtual' as const,
+        }));
 
-      setServers(serverList);
+      // Combine and sort by type (MCP first), then by name
+      const allServers = [...mcpServers, ...virtualServers];
+      allServers.sort((a, b) => {
+        // Sort by type first (mcp before virtual)
+        if (a.type !== b.type) {
+          return a.type === 'mcp' ? -1 : 1;
+        }
+        // Then by name
+        return a.name.localeCompare(b.name);
+      });
+
+      setServers(allServers);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch servers';
       setError(message);

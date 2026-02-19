@@ -761,7 +761,7 @@ const IAMGroups: React.FC<IAMGroupsProps> = ({ onShowToast }) => {
                   <SearchableSelect
                     options={availableServers.map((s) => ({
                       value: s.path,
-                      label: `${s.name} (${s.path})`,
+                      label: `${s.type === 'virtual' ? '[Virtual] ' : ''}${s.name} (${s.path})`,
                       description: s.description,
                     }))}
                     value={entry.server}
@@ -1056,7 +1056,7 @@ const IAMGroups: React.FC<IAMGroupsProps> = ({ onShowToast }) => {
                       <SearchableSelect
                         options={availableServers.map((s) => ({
                           value: s.path,
-                          label: `${s.name} (${s.path})`,
+                          label: `${s.type === 'virtual' ? '[Virtual] ' : ''}${s.name} (${s.path})`,
                           description: s.description,
                         }))}
                         value={entry.server}
