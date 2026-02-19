@@ -12,14 +12,12 @@ import os
 import re
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from ..core.config import settings
-from ..schemas.skill_security import SkillSecurityScanResult, SkillSecurityScanConfig
 from ..repositories.factory import get_skill_security_scan_repository
-
+from ..schemas.skill_security import SkillSecurityScanConfig, SkillSecurityScanResult
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +52,22 @@ class SkillScannerService:
             block_unsafe_skills=settings.skill_security_block_unsafe_skills,
             analyzers=settings.skill_security_analyzers,
             scan_timeout_seconds=settings.skill_security_scan_timeout,
-            llm_api_key=settings.skill_scanner_llm_api_key or os.getenv("SKILL_SCANNER_LLM_API_KEY"),
-            virustotal_api_key=settings.skill_scanner_virustotal_api_key or os.getenv("VIRUSTOTAL_API_KEY"),
-            ai_defense_api_key=settings.skill_scanner_ai_defense_api_key or os.getenv("AI_DEFENSE_API_KEY"),
+            llm_api_key=settings.skill_scanner_llm_api_key
+            or os.getenv("SKILL_SCANNER_LLM_API_KEY"),
+            virustotal_api_key=settings.skill_scanner_virustotal_api_key
+            or os.getenv("VIRUSTOTAL_API_KEY"),
+            ai_defense_api_key=settings.skill_scanner_ai_defense_api_key
+            or os.getenv("AI_DEFENSE_API_KEY"),
             add_security_pending_tag=settings.skill_security_add_pending_tag,
         )
 
     async def scan_skill(
         self,
         skill_path: str,
-        skill_md_url: Optional[str] = None,
-        skill_content_path: Optional[str] = None,
-        analyzers: Optional[str] = None,
-        timeout: Optional[int] = None,
+        skill_md_url: str | None = None,
+        skill_content_path: str | None = None,
+        analyzers: str | None = None,
+        timeout: int | None = None,
     ) -> SkillSecurityScanResult:
         """
         Scan a skill for security vulnerabilities.
@@ -105,7 +106,7 @@ class SkillScannerService:
             result = SkillSecurityScanResult(
                 skill_path=skill_path,
                 skill_md_url=skill_md_url,
-                scan_timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                scan_timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 is_safe=is_safe,
                 critical_issues=critical,
                 high_severity=high,
@@ -131,7 +132,7 @@ class SkillScannerService:
             result = SkillSecurityScanResult(
                 skill_path=skill_path,
                 skill_md_url=skill_md_url,
-                scan_timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                scan_timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 is_safe=False,
                 analyzers_used=analyzers.split(",") if analyzers else [],
                 raw_output={"error": str(e), "scan_failed": True},
@@ -145,8 +146,8 @@ class SkillScannerService:
     def _run_skill_scanner(
         self,
         skill_path: str,
-        skill_md_url: Optional[str] = None,
-        skill_content_path: Optional[str] = None,
+        skill_md_url: str | None = None,
+        skill_content_path: str | None = None,
         analyzers: str = "static",
         timeout: int = 120,
     ) -> dict:
@@ -312,10 +313,12 @@ class SkillScannerService:
 
         is_safe = critical == 0 and high == 0
 
-        logger.info(f"Skill security analysis: Critical={critical}, High={high}, Medium={medium}, Low={low}")
+        logger.info(
+            f"Skill security analysis: Critical={critical}, High={high}, Medium={medium}, Low={low}"
+        )
         return is_safe, critical, high, medium, low
 
-    async def get_scan_result(self, skill_path: str) -> Optional[dict]:
+    async def get_scan_result(self, skill_path: str) -> dict | None:
         """
         Get the latest scan result for a skill.
 

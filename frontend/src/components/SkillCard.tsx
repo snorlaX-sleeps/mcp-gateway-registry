@@ -423,6 +423,7 @@ const SkillCard: React.FC<SkillCardProps> = React.memo(({
                 onClick={handleViewSecurityScan}
                 className={`p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-all duration-200 flex-shrink-0 ${getSecurityIconState().color}`}
                 title={getSecurityIconState().title}
+                aria-label={getSecurityIconState().title}
               >
                 {React.createElement(getSecurityIconState().Icon, { className: `h-4 w-4 ${loadingSecurityScan ? 'animate-pulse' : ''}` })}
               </button>

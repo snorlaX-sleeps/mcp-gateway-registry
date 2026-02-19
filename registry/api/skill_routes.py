@@ -44,8 +44,8 @@ from ..schemas.skill_models import (
     VisibilityEnum,
 )
 from ..services.skill_service import (
-    get_skill_service,
     _is_safe_url,
+    get_skill_service,
 )
 from ..services.tool_validation_service import get_tool_validation_service
 from ..utils.path_utils import normalize_skill_path
@@ -226,15 +226,17 @@ async def search_skills(
                 continue
 
         if score > 0:
-            matching_skills.append({
-                "path": skill.path,
-                "name": skill.name,
-                "description": skill.description,
-                "tags": skill.tags,
-                "visibility": skill.visibility,
-                "is_enabled": skill.is_enabled,
-                "relevance_score": score,
-            })
+            matching_skills.append(
+                {
+                    "path": skill.path,
+                    "name": skill.name,
+                    "description": skill.description,
+                    "tags": skill.tags,
+                    "visibility": skill.visibility,
+                    "is_enabled": skill.is_enabled,
+                    "relevance_score": score,
+                }
+            )
 
     # Sort by relevance score descending
     matching_skills.sort(key=lambda x: x["relevance_score"], reverse=True)
@@ -392,7 +394,6 @@ async def get_skill_rating(
         "num_stars": skill.num_stars,
         "rating_details": skill.rating_details,
     }
-
 
 
 # ---------------------------------------------------------------------------
@@ -821,6 +822,3 @@ async def _perform_skill_security_scan_on_registration(
                     )
             except Exception as tag_err:
                 logger.error(f"Failed to add security-pending tag: {tag_err}")
-
-
-
