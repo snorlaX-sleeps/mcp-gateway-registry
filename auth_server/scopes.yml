@@ -155,6 +155,34 @@ group_mappings:
   - mcp-servers-unrestricted/read
   - mcp-servers-unrestricted/execute
 
+  mcp-servers-unrestricted:
+  - mcp-servers-unrestricted/read
+  - mcp-servers-unrestricted/execute
+
+  mcp-registry-user:
+  - mcp-registry-user
+
+  mcp-registry-developer:
+  - mcp-registry-developer
+
+  mcp-registry-operator:
+  - mcp-registry-operator
+
+  mcp-servers-restricted:
+  - mcp-servers-restricted/read
+  - mcp-servers-restricted/execute
+
+  a2a-agent-admin:
+  - mcp-registry-admin
+  - mcp-servers-unrestricted/read
+  - mcp-servers-unrestricted/execute
+
+  a2a-agent-publisher:
+  - mcp-registry-developer
+
+  a2a-agent-user:
+  - mcp-registry-user
+
   registry-admins:
   - registry-admins
   - mcp-servers-unrestricted/read
