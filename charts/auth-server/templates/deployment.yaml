@@ -67,7 +67,18 @@ spec:
             - secretRef:
                 name: {{ .Values.global.sharedSecretName }}
             {{- end }}
+          volumeMounts:
+          - name: scopes-config
+            mountPath: /app/scopes.yml
+            subPath: scopes.yml
+            readOnly: true
       volumes:
-        - name: script
-          configMap:
-            name: setup-mongodb
+      - name: script
+        configMap:
+          name: setup-mongodb
+      - name: scopes-config
+        configMap:
+          name: auth-server-scopes
+          items:
+            - key: scopes.yml
+              path: scopes.yml
