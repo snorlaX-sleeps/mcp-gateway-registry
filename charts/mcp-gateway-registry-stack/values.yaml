@@ -167,6 +167,8 @@ registry:
     enabled: true
     ingressClassName: alb
 
+  nodeSelector: {}
+
 # Auth server configuration
 auth-server:
   app:
