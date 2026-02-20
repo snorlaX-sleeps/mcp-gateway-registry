@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 from motor.motor_asyncio import AsyncIOMotorCollection
+from pymongo.errors import DuplicateKeyError
 
 from ..audit.models import MCPServerAccessRecord, RegistryApiAccessRecord
 from ..core.config import settings
@@ -244,14 +245,24 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
         try:
             # Convert Pydantic model to dict
             doc = record.model_dump(mode="json")
-            
+
             # Ensure timestamp is stored as datetime for TTL index
             if isinstance(doc.get("timestamp"), str):
                 doc["timestamp"] = datetime.fromisoformat(doc["timestamp"].replace("Z", "+00:00"))
-            
+
             await collection.insert_one(doc)
             logger.info(
                 f"DocumentDB WRITE: Inserted audit event request_id={record.request_id}"
+            )
+            return True
+        except DuplicateKeyError as e:
+            # Duplicate request_id can occur when nginx forwards the same request through
+            # both the auth-server validation endpoint and the actual registry endpoint.
+            # This is not an error condition - we just skip the duplicate.
+            logger.debug(
+                f"DocumentDB WRITE: Skipped duplicate audit event for request_id={record.request_id}. "
+                f"This occurs when the same request_id is processed twice (auth validation + endpoint execution). "
+                f"Returning True to not break the request."
             )
             return True
         except Exception as e:
