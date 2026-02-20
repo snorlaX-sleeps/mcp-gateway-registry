@@ -27,7 +27,7 @@ AuditRecord = Union[RegistryApiAccessRecord, MCPServerAccessRecord]
 class AuditRepositoryBase(ABC):
     """
     Abstract base class for audit event data access.
-    
+
     Implementations:
     - DocumentDBAuditRepository: MongoDB/DocumentDB storage with TTL
     """
@@ -43,14 +43,14 @@ class AuditRepositoryBase(ABC):
     ) -> List[Dict[str, Any]]:
         """
         Find audit events matching the query.
-        
+
         Args:
             query: MongoDB query filter
             limit: Maximum number of results to return
             offset: Number of results to skip for pagination
             sort_field: Field to sort by (default: timestamp)
             sort_order: Sort order (-1 for descending, 1 for ascending)
-            
+
         Returns:
             List of audit event documents
         """
@@ -63,10 +63,10 @@ class AuditRepositoryBase(ABC):
     ) -> Optional[Dict[str, Any]]:
         """
         Find a single audit event matching the query.
-        
+
         Args:
             query: MongoDB query filter
-            
+
         Returns:
             Audit event document if found, None otherwise
         """
@@ -79,10 +79,10 @@ class AuditRepositoryBase(ABC):
     ) -> int:
         """
         Count audit events matching the query.
-        
+
         Args:
             query: MongoDB query filter
-            
+
         Returns:
             Number of matching documents
         """
@@ -95,10 +95,10 @@ class AuditRepositoryBase(ABC):
     ) -> bool:
         """
         Insert an audit event record.
-        
+
         Args:
             record: The audit record to insert (RegistryApiAccessRecord or MCPServerAccessRecord)
-            
+
         Returns:
             True if inserted successfully, False otherwise
         """
@@ -108,7 +108,7 @@ class AuditRepositoryBase(ABC):
 class DocumentDBAuditRepository(AuditRepositoryBase):
     """
     DocumentDB/MongoDB implementation of audit repository.
-    
+
     Stores audit events in a MongoDB collection with TTL index
     for automatic expiration of old events.
     """
@@ -134,14 +134,14 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
     ) -> List[Dict[str, Any]]:
         """
         Find audit events matching the query.
-        
+
         Args:
             query: MongoDB query filter
             limit: Maximum number of results to return
             offset: Number of results to skip for pagination
             sort_field: Field to sort by (default: timestamp)
             sort_order: Sort order (-1 for descending, 1 for ascending)
-            
+
         Returns:
             List of audit event documents
         """
@@ -155,14 +155,14 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
             cursor = collection.find(query)
             cursor = cursor.sort(sort_field, sort_order)
             cursor = cursor.skip(offset).limit(limit)
-            
+
             events = []
             async for doc in cursor:
                 # Convert _id to string if it's an ObjectId
                 if "_id" in doc:
                     doc["_id"] = str(doc["_id"])
                 events.append(doc)
-            
+
             logger.debug(f"DocumentDB READ: Found {len(events)} audit events")
             return events
         except Exception as e:
@@ -175,10 +175,10 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
     ) -> Optional[Dict[str, Any]]:
         """
         Find a single audit event matching the query.
-        
+
         Args:
             query: MongoDB query filter
-            
+
         Returns:
             Audit event document if found, None otherwise
         """
@@ -205,10 +205,10 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
     ) -> int:
         """
         Count audit events matching the query.
-        
+
         Args:
             query: MongoDB query filter
-            
+
         Returns:
             Number of matching documents
         """
@@ -229,10 +229,10 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
     ) -> bool:
         """
         Insert an audit event record.
-        
+
         Args:
             record: The audit record to insert (RegistryApiAccessRecord or MCPServerAccessRecord)
-            
+
         Returns:
             True if inserted successfully, False otherwise
         """

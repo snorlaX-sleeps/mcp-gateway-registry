@@ -265,7 +265,7 @@ async def get_servers_json(
     """Get servers data as JSON for React frontend and external API (supports both session cookies and Bearer tokens)."""
     # Set audit action for server list
     set_audit_action(request, "list", "server", description="List all servers")
-    
+
     # CRITICAL DIAGNOSTIC: Log user_context received by endpoint
     logger.debug(f"[GET_SERVERS_DEBUG] Received user_context: {user_context}")
     logger.debug(f"[GET_SERVERS_DEBUG] user_context type: {type(user_context)}")
@@ -2922,7 +2922,7 @@ async def register_service_api(
     """
     # Set audit action for server registration
     set_audit_action(request, "create", "server", resource_id=path, description=f"Register server {name}")
-    
+
     logger.info(
         f"API register service request from user '{user_context.get('username')}' for service '{name}'"
     )
@@ -3997,7 +3997,7 @@ async def rate_server(
     """Save integer ratings to server."""
     # Set audit action for server rating
     set_audit_action(request, "rate", "server", resource_id=path, description=f"Rate server with {rating_request.rating}")
-    
+
     if not path.startswith("/"):
         path = "/" + path
 
