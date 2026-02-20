@@ -34,6 +34,7 @@ global:
 
   # Common ingress settings
   ingress:
+    enabled: true
     inboundCidrs: # optional comma separated list of allowed inbound CIDR ranges
     className: alb
     tls: true
