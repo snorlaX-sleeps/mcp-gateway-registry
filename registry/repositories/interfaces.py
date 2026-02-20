@@ -626,6 +626,98 @@ class SecurityScanRepositoryBase(ABC):
         pass
 
 
+class SkillSecurityScanRepositoryBase(ABC):
+    """
+    Abstract base class for skill security scan results data access.
+
+    Implementations:
+    - FileSkillSecurityScanRepository: reads ~/mcp-gateway/skill_security_scans/*.json
+    - DocumentDBSkillSecurityScanRepository: reads mcp-skill-security-scans collection
+    """
+
+    @abstractmethod
+    async def get(
+        self,
+        skill_path: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get latest security scan result for a skill.
+
+        Args:
+            skill_path: Skill path (e.g., "/skills/pdf-processing")
+
+        Returns:
+            Security scan result dict if found, None otherwise.
+        """
+        pass
+
+    @abstractmethod
+    async def list_all(self) -> List[Dict[str, Any]]:
+        """
+        List all skill security scan results.
+
+        Returns:
+            List of all skill security scan result dicts.
+        """
+        pass
+
+    @abstractmethod
+    async def create(
+        self,
+        scan_result: Dict[str, Any],
+    ) -> bool:
+        """
+        Create/update a skill security scan result.
+
+        Args:
+            scan_result: Skill security scan result dict. Must contain "skill_path".
+
+        Returns:
+            True if created successfully.
+        """
+        pass
+
+    @abstractmethod
+    async def get_latest(
+        self,
+        skill_path: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get latest scan result for a skill.
+
+        Args:
+            skill_path: Skill path
+
+        Returns:
+            Latest scan result if found, None otherwise.
+        """
+        pass
+
+    @abstractmethod
+    async def query_by_status(
+        self,
+        status: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        Query scan results by status.
+
+        Args:
+            status: Scan status (e.g., "completed", "failed", "pending")
+
+        Returns:
+            List of scan results with the given status.
+        """
+        pass
+
+    @abstractmethod
+    async def load_all(self) -> None:
+        """
+        Load/reload all skill security scan results from storage.
+        Called once at application startup.
+        """
+        pass
+
+
 class SearchRepositoryBase(ABC):
     """Abstract base class for semantic/hybrid search using FAISS or DocumentDB."""
 

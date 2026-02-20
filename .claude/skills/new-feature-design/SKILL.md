@@ -1,6 +1,7 @@
 ---
 name: new-feature-design
 description: "Design and document new features with GitHub issue, low-level design (LLD), and expert review. Creates structured documentation in .scratchpad/ with issue spec, technical design with diagrams and pseudo-code, and multi-persona expert review. Supports starting from a user description OR an existing GitHub issue URL. Folder naming: issue-{number}/ for existing issues, {feature-name}/ for new features."
+license: Apache-2.0
 metadata:
   author: mcp-gateway-registry
   version: "1.4"
@@ -775,6 +776,40 @@ def new_function(
 |-----------|-------|-------------------|
 | `registry/main.py` | ~50 | Add router import and include |
 | `registry/models/domain.py` | ~100-150 | Add new model |
+
+### API Client Updates (IMPORTANT)
+
+**When new API endpoints are added or modified, the following files MUST also be updated:**
+
+| File Path | Update Required |
+|-----------|-----------------|
+| `api/registry_client.py` | Add Pydantic response models and client methods for new endpoints |
+| `api/registry_management.py` | Add CLI commands (argparse parsers) and handler functions |
+| `api/openapi.json` | Regenerate OpenAPI spec if using auto-generation |
+
+**Example additions for a new endpoint `GET /api/feature/{path}/data`:**
+
+```python
+# In api/registry_client.py:
+class FeatureDataResponse(BaseModel):
+    """Response model for feature data endpoint."""
+    path: str = Field(..., description="Feature path")
+    data: dict = Field(..., description="Feature data")
+
+def get_feature_data(self, path: str) -> FeatureDataResponse:
+    """Get feature data from the registry."""
+    response = self._make_request("GET", f"/api/feature/{path}/data")
+    return FeatureDataResponse(**response)
+
+# In api/registry_management.py:
+def cmd_feature_data(args: argparse.Namespace) -> None:
+    """Get feature data command handler."""
+    client = _get_client(args)
+    result = client.get_feature_data(path=args.path)
+    # Display result...
+```
+
+This ensures the registry management CLI stays in sync with backend API capabilities.
 
 ### Estimated Lines of Code
 
