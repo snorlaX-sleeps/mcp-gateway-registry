@@ -452,9 +452,7 @@ class NginxConfigService:
                 version_map = ""
 
             # Replace placeholders in template
-            root_path = os.environ.get("ROOT_PATH", "").rstrip("/")
-            config_content = template_content.replace("{{ROOT_PATH}}", root_path)
-            config_content = config_content.replace("{{VERSION_MAP}}", version_map)
+            config_content = template_content.replace("{{VERSION_MAP}}", version_map)
             config_content = config_content.replace(
                 "{{LOCATION_BLOCKS}}", "\n".join(location_blocks)
             )
@@ -504,6 +502,9 @@ class NginxConfigService:
             except Exception as e:
                 logger.error(f"Failed to generate virtual server config: {e}", exc_info=True)
                 config_content = config_content.replace("{{VIRTUAL_SERVER_BLOCKS}}", "")
+
+            root_path = os.environ.get("ROOT_PATH", "").rstrip("/")
+            config_content = config_content.replace("{{ROOT_PATH}}", root_path)
 
             # Write config file
             with open(settings.nginx_config_path, "w") as f:
