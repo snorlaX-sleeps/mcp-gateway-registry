@@ -81,6 +81,16 @@ _registry_static_token_requested: bool = (
 # Static API key for Registry API (must match Bearer token value when enabled)
 REGISTRY_API_TOKEN: str = os.environ.get("REGISTRY_API_TOKEN", "")
 
+# OAuth token storage in session cookies (disable for IdPs with large tokens)
+# Default: false - tokens are not used functionally and storing them risks cookie size limits
+OAUTH_STORE_TOKENS_IN_SESSION: bool = (
+    os.environ.get("OAUTH_STORE_TOKENS_IN_SESSION", "false").lower() == "true"
+)
+
+logging.info(
+    f"OAUTH_STORE_TOKENS_IN_SESSION={OAUTH_STORE_TOKENS_IN_SESSION}"
+)
+
 # Validate configuration: static token auth requires REGISTRY_API_TOKEN to be set
 if _registry_static_token_requested and not REGISTRY_API_TOKEN:
     logging.error(
@@ -409,18 +419,20 @@ def parse_server_and_tool_from_url(original_url: str) -> tuple[str | None, str |
 
 def _normalize_server_name(name: str) -> str:
     """
-    Normalize server name by removing trailing slash for comparison.
+    Normalize server name by removing leading and trailing slashes for comparison.
 
-    This handles cases where a server is registered with a trailing slash
-    but accessed without one (or vice versa).
+    This handles cases where a server is registered with a leading or trailing
+    slash but accessed without one (or vice versa). Scope configs from the UI
+    store server names with a leading slash (e.g. '/cloudflare-docs') while the
+    URL extraction produces names without one (e.g. 'cloudflare-docs').
 
     Args:
         name: Server name to normalize
 
     Returns:
-        Normalized server name (without trailing slash)
+        Normalized server name (without leading or trailing slashes)
     """
-    return name.rstrip("/") if name else name
+    return name.strip("/") if name else name
 
 
 def _server_names_match(name1: str, name2: str) -> bool:
@@ -2583,7 +2595,8 @@ async def oauth2_callback(
             logger.info(f"Mapped user info: {mapped_user}")
 
         # Create session cookie compatible with registry
-        # Include OAuth tokens for programmatic API access
+        # OAuth tokens are conditionally stored based on OAUTH_STORE_TOKENS_IN_SESSION
+        # Disable for large tokens (e.g., Entra ID) to avoid cookie size limits (4096 bytes)
         session_data = {
             "username": mapped_user["username"],
             "email": mapped_user.get("email"),
@@ -2591,12 +2604,15 @@ async def oauth2_callback(
             "groups": mapped_user.get("groups", []),
             "provider": provider,
             "auth_method": "oauth2",
-            # Store OAuth tokens for later use (e.g., "Get JWT Token" button)
-            "access_token": token_data.get("access_token"),
-            "refresh_token": token_data.get("refresh_token"),
-            "token_expires_in": token_data.get("expires_in"),
-            "token_obtained_at": int(time.time()),
         }
+
+        if OAUTH_STORE_TOKENS_IN_SESSION:
+            session_data.update({
+                "access_token": token_data.get("access_token"),
+                "refresh_token": token_data.get("refresh_token"),
+                "token_expires_in": token_data.get("expires_in"),
+                "token_obtained_at": int(time.time()),
+            })
 
         registry_session = signer.dumps(session_data)
 
