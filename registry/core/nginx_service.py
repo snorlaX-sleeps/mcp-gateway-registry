@@ -267,7 +267,7 @@ class NginxConfigService:
                 "on",
             ):
                 protected_api_block = """    # Protected API endpoints - require authentication
-    location /api/ {
+    location {{ROOT_PATH}}/api/ {
         # Authenticate request via auth server (validates JWT Bearer tokens)
         auth_request /validate;
 
@@ -306,7 +306,7 @@ class NginxConfigService:
     }"""
 
                 unprotected_api_block = """    # API endpoints - FastAPI handles authentication (session cookie / bearer)
-    location /api/ {
+    location {{ROOT_PATH}}/api/ {
         # Proxy to FastAPI service
         proxy_pass http://127.0.0.1:7860/api/;
         proxy_http_version 1.1;
@@ -365,7 +365,7 @@ class NginxConfigService:
                         else:
                             # Add commented out block for unhealthy services
                             commented_block = f"""
-#    location {path}/ {{
+#    location {{{{ROOT_PATH}}}}{path}/ {{
 #        # Service currently unhealthy (status: {health_status})
 #        # Proxy to MCP server
 #        proxy_pass {proxy_pass_url};
@@ -582,7 +582,7 @@ class NginxConfigService:
         block = '''
     # Registry-only mode: block MCP proxy requests with 503
     # Matches paths that don't start with known API/auth prefixes
-    location ~ ^/(?!api/|oauth2/|keycloak/|realms/|resources/|v0\\.1/|health|static/|assets/|_next/|validate).+ {
+    location ~ ^{{ROOT_PATH}}/(?!api/|oauth2/|keycloak/|realms/|resources/|v0\\.1/|health|static/|assets/|_next/|validate).+ {
         default_type application/json;
         return 503 '{"error":"gateway_proxy_disabled","message":"Gateway proxy is disabled in registry-only mode. Connect directly to the MCP server using the proxy_pass_url from server registration.","deployment_mode":"registry-only","hint":"Use GET /api/servers/{path} to retrieve the proxy_pass_url for direct connection."}';
     }'''
@@ -762,7 +762,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
 
                 block = f"""
     # Virtual MCP Server: {safe_name}
-    location {vs.path} {{
+    location {{{{ROOT_PATH}}}}{vs.path} {{
         set $virtual_server_id "{safe_id}";
         auth_request /validate;
         auth_request_set $auth_scopes $upstream_http_x_scopes;
@@ -849,7 +849,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
                 location_path = f"/_vs_backend{sanitized}"
 
                 block = f"""
-    location {location_path} {{
+    location {{{{ROOT_PATH}}}}{location_path} {{
         internal;
         proxy_pass {mcp_proxy_url};
         proxy_http_version 1.1;
@@ -1158,7 +1158,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
             transport_settings = """
         # Capture request body for auth validation using Lua
         rewrite_by_lua_file /etc/nginx/lua/capture_body.lua;
-        
+
         # Generic transport configuration
         proxy_buffering off;
         proxy_cache off;
@@ -1172,7 +1172,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
         logger.info(f"Creating location block for {location_path} with {transport_type} transport")
 
         return f"""
-    location {location_path} {{{transport_settings}{common_settings}
+    location {{{{ROOT_PATH}}}}{location_path}/ {{{transport_settings}{common_settings}
     }}"""
 
 
