@@ -235,7 +235,8 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
             record: The audit record to insert (RegistryApiAccessRecord or MCPServerAccessRecord)
 
         Returns:
-            True if inserted successfully, False otherwise
+            True if inserted successfully or if the record already exists (duplicate request_id),
+            False if an unexpected error occurs
         """
         logger.debug(
             f"DocumentDB WRITE: Inserting audit event with request_id={record.request_id}"
@@ -255,7 +256,7 @@ class DocumentDBAuditRepository(AuditRepositoryBase):
                 f"DocumentDB WRITE: Inserted audit event request_id={record.request_id}"
             )
             return True
-        except DuplicateKeyError as e:
+        except DuplicateKeyError:
             logger.debug(
                 f"DocumentDB WRITE: Skipped duplicate audit event for request_id={record.request_id}. "
                 f"This occurs when the same request_id is processed twice (auth validation + endpoint execution). "
