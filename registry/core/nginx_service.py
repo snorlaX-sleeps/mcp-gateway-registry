@@ -1173,7 +1173,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
         logger.info(f"Creating location block for {location_path} with {transport_type} transport")
 
         return f"""
-    location {{{{ROOT_PATH}}}}{location_path}/ {{{transport_settings}{common_settings}
+    location {{{{ROOT_PATH}}}}{location_path} {{{transport_settings}{common_settings}
     }}"""
 
 
