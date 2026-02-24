@@ -18,6 +18,10 @@ spec:
         app.kubernetes.io/name: {{ .Values.app.name }}
         app.kubernetes.io/component: {{ .Values.app.name }}
     spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
         - name: wait-for-mongodb
           image: public.ecr.aws/docker/library/python:3.13-slim
@@ -67,6 +71,13 @@ spec:
               value: {{ .Values.app.deploymentMode | default "with-gateway" | quote }}
             - name: REGISTRY_MODE
               value: {{ .Values.app.registryMode | default "full" | quote }}
+            {{- if eq (.Values.global.authProvider.type | default "keycloak") "keycloak" }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-keycloak
+                  key: admin-password
+            {{- end }}
       volumes:
         - name: script
           configMap:

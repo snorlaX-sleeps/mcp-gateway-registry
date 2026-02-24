@@ -29,6 +29,10 @@ global:
   authProvider:
     # Provider type: "keycloak" or "entra"
     type: keycloak
+    keycloak:
+      adminUsername: &keycloakAdmin "user"
+      realm: &keycloakRealm "mcp-gateway"
+      # Don't set password here - let Keycloak chart generate it
     entra:
       adminGroupId: # UUID of Entra admin group
 
@@ -52,6 +56,7 @@ mongodb-kubernetes:
     enableClusterMongoDBRoles: false
     telemetry:
       installClusterRole: false
+    nodeSelector: {}
 
 # MongoDB configuration
 mongodb:
@@ -72,6 +77,10 @@ keycloak:
     security:
       allowInsecureImages: true
 
+  auth:
+    adminUser: *keycloakAdmin
+    # Don't set adminPassword - let it auto-generate
+
   postgresql:
     image:
       registry: public.ecr.aws
@@ -90,6 +99,8 @@ keycloak:
 
   ingress:
     enabled: false  # We use a custom ingress template that supports global.domain
+
+  nodeSelector: {}
 
   # Lifecycle hook to configure realm SSL settings
   lifecycleHooks:
@@ -134,8 +145,8 @@ keycloak:
 keycloak-configure:
   enabled: true  # Set to false to skip Keycloak configuration or when using Entra
   keycloak:
-    realm: mcp-gateway
-    adminUser: user
+    realm: *keycloakRealm
+    adminUser: *keycloakAdmin
   # authServer.externalUrl will be templated in the subchart using global.domain
 
 # Keycloak ingress for mcp-gateway-registry
@@ -160,6 +171,8 @@ registry:
     enabled: true
     ingressClassName: alb
 
+  nodeSelector: {}
+
 # Auth server configuration
 auth-server:
   app:
@@ -167,7 +180,7 @@ auth-server:
 
   keycloak:
     enabled: true
-    realm: mcp-gateway
+    realm: *keycloakRealm
     # externalUrl will be templated in the subchart using global.domain
 
   # Entra ID settings (used when global.authProvider.type = "entra")
@@ -179,3 +192,5 @@ auth-server:
   ingress:
     enabled: true
     ingressClassName: alb
+
+  nodeSelector: {}
