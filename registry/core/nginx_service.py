@@ -850,7 +850,7 @@ map "$uri:$http_x_mcp_server_version" $versioned_backend {{
                 location_path = f"/_vs_backend{sanitized}"
 
                 block = f"""
-    location {{{{ROOT_PATH}}}}{location_path} {{
+    location {location_path} {{
         internal;
         proxy_pass {mcp_proxy_url};
         proxy_http_version 1.1;
